@@ -12,9 +12,7 @@ from openpyxl import Workbook
 from openpyxl.styles import (
     Font, PatternFill, Alignment, Border, Side, numbers,
 )
-from openpyxl.chart import BarChart, PieChart, Reference
-from openpyxl.chart.label import DataLabelList
-from openpyxl.chart.series import DataPoint
+## Charts removed — clean text-only reports
 from openpyxl.utils import get_column_letter
 
 from shared.logger import print
@@ -340,12 +338,13 @@ _PRIORITY_COLUMNS = [
     'Processed At',
 ]
 
-# Columns to HIDE from the report (internal only)
+# Columns to HIDE from the report (internal / redundant)
 _HIDDEN_COLUMNS = {
     'Backup Code', 'Backup Codes', 'row_index', 'Screenshots Folder',
     'New Authenticator Key',  # redundant — TOTP Secret holds effective value
     'Password (Current)', 'TOTP (Current)',  # legacy — originals are overwritten
     'Recovery Email (Current)', 'Recovery Phone (Current)',
+    'Proxy',  # internal
 }
 
 # Display-friendly header names for columns with internal/snake_case names
@@ -488,24 +487,36 @@ for i in range(1, 11):
     _TEMPLATE_EXAMPLES[f'Backup Code {i}'] = f'CODE{i}'
 
 
-def _get_step_columns(all_columns: list, step_name: str, sheet_type: str) -> list:
+def _get_step_columns(all_columns: list, step_name: str, sheet_type: str, accounts: list = None) -> list:
     """Return step-specific columns for a given sheet type.
 
     Args:
         all_columns: All columns present in the data.
         step_name:   'step1', 'step2', 'step3', 'step4', or '' (auto-detect).
         sheet_type:  'all', 'success', or 'failed'.
+        accounts:    Account data — used to filter out empty columns.
 
     Returns:
-        Ordered list of columns to include, filtered to only those present.
+        Ordered list of columns to include, filtered to only those present and non-empty.
     """
+    _NAN = {'nan', 'None', 'NaT', '', None}
+
+    # Build set of columns that have at least one non-empty value
+    non_empty = set(all_columns)
+    if accounts:
+        non_empty = set()
+        for a in accounts:
+            for k, v in a.items():
+                if str(v).strip() not in _NAN:
+                    non_empty.add(k)
+
     step_def = _STEP_COLUMNS.get(step_name)
     if step_def:
         template = step_def.get(sheet_type, step_def['all'])
-        return [c for c in template if c in all_columns]
+        return [c for c in template if c in all_columns and c in non_empty]
 
-    # Fallback: use full classify
-    return _classify_columns(all_columns)
+    # Fallback: use full classify (also filters empty)
+    return _classify_columns(all_columns, accounts)
 
 
 def _apply_effective_values(accounts: list, step_name: str) -> list:
@@ -556,8 +567,23 @@ def _apply_effective_values(accounts: list, step_name: str) -> list:
     return result
 
 
-def _classify_columns(all_columns: list) -> list:
-    """Return columns in display order, excluding hidden ones."""
+def _classify_columns(all_columns: list, accounts: list = None) -> list:
+    """Return columns in display order, excluding hidden and empty ones.
+
+    If accounts is provided, also drops columns where ALL rows are empty/nan.
+    """
+    _NAN = {'nan', 'None', 'NaT', '', None}
+
+    # Build set of columns that have at least one non-empty value
+    if accounts:
+        non_empty = set()
+        for a in accounts:
+            for k, v in a.items():
+                if str(v).strip() not in _NAN:
+                    non_empty.add(k)
+    else:
+        non_empty = set(all_columns)
+
     priority = []
     op_cols = []
     other = []
@@ -565,7 +591,10 @@ def _classify_columns(all_columns: list) -> list:
     for col in all_columns:
         if col in _HIDDEN_COLUMNS:
             continue
-        elif col in _PRIORITY_COLUMNS:
+        # Skip columns with NO data in any row
+        if col not in non_empty:
+            continue
+        if col in _PRIORITY_COLUMNS:
             priority.append(col)
         elif _OP_COL_PAT.match(col):
             op_cols.append(col)
@@ -574,7 +603,6 @@ def _classify_columns(all_columns: list) -> list:
 
     # Sort priority columns by their defined order
     priority.sort(key=lambda c: _PRIORITY_COLUMNS.index(c) if c in _PRIORITY_COLUMNS else 999)
-    # Sort operation columns naturally
     op_cols.sort()
     other.sort()
 
@@ -726,85 +754,33 @@ def _write_dashboard(ws, accounts):
         _set_cell(ws, row, 2 + eidx * 3, evalue, BODY_FONT)
     row += 2
 
-    # ── Pie Chart — Status Distribution ──────────────────────────────────
-    _set_cell(ws, row, 1, 'STATUS DISTRIBUTION', SECTION_FONT)
-    row += 1
-    pie_start = row
-
-    pie_labels = ['Successful', 'Failed', 'Skipped', 'Pending']
-    pie_values = [success, failed, skipped, pending]
-
-    for i, (pl, pv) in enumerate(zip(pie_labels, pie_values)):
-        _set_cell(ws, row + i, 1, pl, BODY_FONT)
-        _set_cell(ws, row + i, 2, pv, BODY_FONT)
-
-    if total > 0:
-        pie = PieChart()
-        pie.title = 'Account Status'
-        pie.style = 10
-        pie_data = Reference(ws, min_col=2, min_row=pie_start, max_row=pie_start + 3)
-        pie_cats = Reference(ws, min_col=1, min_row=pie_start, max_row=pie_start + 3)
-        pie.add_data(pie_data)
-        pie.set_categories(pie_cats)
-
-        # Colour slices
-        colors = [_GREEN, _RED, _YELLOW, _BLUE]
-        for si, clr in enumerate(colors):
-            pt = DataPoint(idx=si)
-            pt.graphicalProperties.solidFill = clr
-            pie.series[0].data_points.append(pt)
-
-        pie.dataLabels = DataLabelList()
-        pie.dataLabels.showPercent = True
-        pie.dataLabels.showVal = True
-        pie.dataLabels.showCatName = False
-        pie.width = 16
-        pie.height = 12
-        ws.add_chart(pie, f'D{pie_start}')
-
-    row = pie_start + 4 + 1
-
-    # ── Operation Breakdown ───────────────────────────────────────────────
+    # ── Operation Breakdown (clean text table — no charts) ───────────────
     op_cols = _detect_op_columns([k for a in accounts for k in a.keys()])
-    # Deduplicate while preserving order
     seen = set()
-    op_cols_unique = []
-    for oc in op_cols:
-        if oc not in seen:
-            seen.add(oc)
-            op_cols_unique.append(oc)
-    op_cols = op_cols_unique
+    op_cols = [oc for oc in op_cols if not (oc in seen or seen.add(oc))]
+    # Filter out operation columns where ALL values are empty/N/A
+    _NAN_VALS = {'', 'NONE', 'NAN', 'NAT', 'NOT REQUESTED'}
+    op_cols = [oc for oc in op_cols if any(
+        str(a.get(oc, '')).strip().upper() not in _NAN_VALS for a in accounts
+    )]
 
     if op_cols:
-        row += 1
         _set_cell(ws, row, 1, 'OPERATION BREAKDOWN', SECTION_FONT)
         row += 1
 
-        # Headers
-        op_hdrs = ['Operation', 'Success', 'Failed', 'Skipped', 'N/A']
+        op_hdrs = ['Operation', 'Success', 'Failed', 'Skipped']
         for ci, h in enumerate(op_hdrs, 1):
             _set_cell(ws, row, ci, h, HEADER_FONT, HEADER_FILL, HEADER_ALIGN, THIN_BORDER)
         row += 1
-        chart_start = row
 
         for op_col in op_cols:
-            s, f, sk, na = 0, 0, 0, 0
+            s, f, sk = 0, 0, 0
             for a in accounts:
                 v = str(a.get(op_col, '')).strip().upper()
-                if not v or v in ('NONE', 'NAN', ''):
-                    na += 1
-                elif 'SUCCESS' in v:
-                    s += 1
-                elif 'FAILED' in v or 'FAIL' in v:
-                    f += 1
-                elif 'SKIP' in v:
-                    sk += 1
-                elif 'NOT REQUESTED' in v:
-                    na += 1
-                else:
-                    na += 1
+                if 'SUCCESS' in v: s += 1
+                elif 'FAILED' in v or 'FAIL' in v: f += 1
+                elif 'SKIP' in v: sk += 1
 
-            # Clean op name: "Op1: Change Password" → "Change Password"
             display_name = op_col.split(':', 1)[1].strip() if ':' in op_col else op_col
             _set_cell(ws, row, 1, display_name, BOLD_BODY, border=THIN_BORDER)
             _set_cell(ws, row, 2, s, BODY_FONT,
@@ -816,34 +792,7 @@ def _write_dashboard(ws, accounts):
             _set_cell(ws, row, 4, sk, BODY_FONT,
                       PatternFill(start_color=_YELLOW_BG, end_color=_YELLOW_BG, fill_type='solid') if sk > 0 else None,
                       Alignment(horizontal='center'), THIN_BORDER)
-            _set_cell(ws, row, 5, na, BODY_FONT, None, Alignment(horizontal='center'), THIN_BORDER)
             row += 1
-
-        chart_end = row - 1
-
-        # Bar chart
-        if chart_end >= chart_start:
-            bar = BarChart()
-            bar.type = 'col'
-            bar.grouping = 'stacked'
-            bar.style = 10
-            bar.title = 'Operations Overview'
-            bar.y_axis.title = 'Accounts'
-
-            for ci, clr in [(2, _GREEN), (3, _RED), (4, _YELLOW)]:
-                ref = Reference(ws, min_col=ci, min_row=chart_start - 1, max_row=chart_end)
-                bar.add_data(ref, titles_from_data=True)
-
-            cats = Reference(ws, min_col=1, min_row=chart_start, max_row=chart_end)
-            bar.set_categories(cats)
-
-            for si, clr in enumerate([_GREEN, _RED, _YELLOW]):
-                bar.series[si].graphicalProperties.solidFill = clr
-
-            bar.width = 24
-            bar.height = 14
-            bar.shape = 4
-            ws.add_chart(bar, f'A{row + 1}')
 
     # ── Changes Applied (per account) ────────────────────────────────────
     # Collect which accounts have any new/applied values
@@ -1074,27 +1023,7 @@ def _write_error_analysis(ws, accounts):
                   Alignment(horizontal='center'), THIN_BORDER)
         row += 1
 
-    chart_end = row - 1
-
-    # ── Error bar chart ──────────────────────────────────────────────────
-    if chart_end >= chart_start:
-        bar = BarChart()
-        bar.type = 'bar'
-        bar.style = 10
-        bar.title = 'Errors by Type'
-        bar.y_axis.title = None
-        bar.x_axis.title = 'Count'
-
-        data_ref = Reference(ws, min_col=2, min_row=chart_start - 1, max_row=chart_end)
-        cats_ref = Reference(ws, min_col=1, min_row=chart_start, max_row=chart_end)
-        bar.add_data(data_ref, titles_from_data=True)
-        bar.set_categories(cats_ref)
-        bar.series[0].graphicalProperties.solidFill = _RED
-        bar.width = 22
-        bar.height = max(8, len(sorted_titles) * 2.5)
-        bar.shape = 4
-
-        ws.add_chart(bar, f'A{row + 1}')
+    # No chart — clean text table is enough
 
     _auto_fit(ws, min_w=14, max_w=60)
     ws.column_dimensions['C'].width = 45
@@ -1144,18 +1073,20 @@ def generate_report(output_dir, accounts_data, session_id=None, step_name=''):
         all_cols_set.update(a.keys())
     all_cols_list = list(all_cols_set)
 
-    # Step-aware column selection (per-step, per-sheet-type)
-    all_accounts_cols = _get_step_columns(all_cols_list, step_name, 'all')
-    success_cols      = _get_step_columns(all_cols_list, step_name, 'success')
-    failed_cols       = _get_step_columns(all_cols_list, step_name, 'failed')
+    # Step-aware column selection — also filters out empty columns
+    all_accounts_cols = _get_step_columns(all_cols_list, step_name, 'all', accounts_data)
+    success_list_pre = [a for a in accounts_data if 'SUCCESS' in _status_of(a)]
+    failed_list_pre  = [a for a in accounts_data if 'FAILED' in _status_of(a)]
+    success_cols = _get_step_columns(all_cols_list, step_name, 'success', success_list_pre)
+    failed_cols  = _get_step_columns(all_cols_list, step_name, 'failed', failed_list_pre)
 
     # Fallback: if step-specific filtering returned nothing, use full classify
     if not all_accounts_cols:
-        all_accounts_cols = _classify_columns(all_cols_list)
+        all_accounts_cols = _classify_columns(all_cols_list, accounts_data)
     if not success_cols:
-        success_cols = _classify_columns(all_cols_list)
+        success_cols = _classify_columns(all_cols_list, success_list_pre)
     if not failed_cols:
-        failed_cols = all_accounts_cols  # fallback to all columns
+        failed_cols = all_accounts_cols
 
     wb = Workbook()
 
