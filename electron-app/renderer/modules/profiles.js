@@ -1340,12 +1340,11 @@
             _healthModalProfiles = [];
         }
 
-        // Pre-check profiles selected in main table
+        // Pre-check profiles selected in main table (only those from current group filter if active)
         _healthModalProfiles.forEach(p => {
             if (_selectedIds.has(p.id)) _healthChecked.add(p.id);
         });
-        // If none selected, check all
-        if (_healthChecked.size === 0) _healthModalProfiles.forEach(p => _healthChecked.add(p.id));
+        // If none pre-selected, DON'T auto-check all — let user pick via Select All button
 
         _renderHealthProfileList();
         _updateHealthCount();
@@ -1819,17 +1818,25 @@
             });
         });
 
-        // Select All checkbox — selects ALL visible profiles (no pagination limit)
+        // Select All checkbox — only selects VISIBLE (filtered) profiles
         const selectAll = _$('pmSelectAll');
         if (selectAll) {
             selectAll.addEventListener('change', () => {
-                const checks = document.querySelectorAll('.pm-row-check');
-                checks.forEach(cb => {
-                    cb.checked = selectAll.checked;
-                    if (selectAll.checked) _selectedIds.add(cb.dataset.id);
-                    else _selectedIds.delete(cb.dataset.id);
-                    cb.closest('.pm-row').classList.toggle('pm-selected', cb.checked);
-                });
+                if (selectAll.checked) {
+                    // Add only currently visible rows (respects group/status/search filter)
+                    document.querySelectorAll('.pm-row-check').forEach(cb => {
+                        cb.checked = true;
+                        _selectedIds.add(cb.dataset.id);
+                        cb.closest('.pm-row').classList.add('pm-selected');
+                    });
+                } else {
+                    // Clear ALL selections (not just visible)
+                    _selectedIds.clear();
+                    document.querySelectorAll('.pm-row-check').forEach(cb => {
+                        cb.checked = false;
+                        cb.closest('.pm-row').classList.remove('pm-selected');
+                    });
+                }
                 _updateBulkBar();
             });
         }
@@ -1943,12 +1950,14 @@
         _btn('appealModalCancelBtn', closeAppealModal);
         _btn('appealModalStartBtn', startDoAllAppeal);
         _btn('appealSelectAll', () => {
+            // Only select profiles visible in current filter (group + search)
             _filteredAppeal().forEach(p => _appealChecked.add(p.id));
             _renderAppealList();
             _updateAppealCount();
         });
         _btn('appealDeselectAll', () => {
-            _filteredAppeal().forEach(p => _appealChecked.delete(p.id));
+            // Clear ALL selections (clean slate), not just filtered
+            _appealChecked.clear();
             _renderAppealList();
             _updateAppealCount();
         });
@@ -1965,6 +1974,8 @@
             appealGroupEl.addEventListener('change', () => {
                 _appealGroupFilter = appealGroupEl.value;
                 _appealPage = 1;
+                // Clear old selections when group changes to avoid cross-group accumulation
+                _appealChecked.clear();
                 _renderAppealList();
                 _updateAppealCount();
             });
@@ -2015,12 +2026,14 @@
             _updateHealthCount();
         });
         _btn('healthProfileSelectAll', () => {
+            // Only select profiles visible in current filter (group + search)
             _filteredHealth().forEach(p => _healthChecked.add(p.id));
             _renderHealthProfileList();
             _updateHealthCount();
         });
         _btn('healthProfileDeselectAll', () => {
-            _filteredHealth().forEach(p => _healthChecked.delete(p.id));
+            // Clear ALL selections (clean slate)
+            _healthChecked.clear();
             _renderHealthProfileList();
             _updateHealthCount();
         });
@@ -2037,6 +2050,8 @@
             healthGroupEl.addEventListener('change', () => {
                 _healthGroupFilter = healthGroupEl.value;
                 _healthProfilePage = 1;
+                // Clear old selections when group changes to avoid cross-group accumulation
+                _healthChecked.clear();
                 _renderHealthProfileList();
                 _updateHealthCount();
             });

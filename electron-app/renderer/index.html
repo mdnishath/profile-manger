@@ -203,58 +203,104 @@
         <!-- Results Page -->
         <div class="page" id="results">
             <div class="page-header">
-                <h1>Report Ledger</h1>
-                <p>Post-execution analytics and payload outputs.</p>
+                <h1><i class="fas fa-chart-bar" style="margin-right:8px;color:var(--primary);"></i>Reports</h1>
+                <p>Generate, view, and manage reports for all operations.</p>
             </div>
-            <div class="card glass">
-                <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
-                    <div>
-                        <h3><i class="fas fa-history"></i> Execution History</h3>
-                        <p class="card-subtitle">Auto-generated reports from the <code>/output</code> directory.</p>
+
+            <!-- Quick Generate Cards -->
+            <div class="rpt-gen-grid">
+                <div class="rpt-gen-card" style="--accent:#60a5fa;">
+                    <div class="rpt-gen-icon"><i class="fas fa-users"></i></div>
+                    <div class="rpt-gen-info">
+                        <div class="rpt-gen-title">All Profiles</div>
+                        <div class="rpt-gen-desc">Appeal + Health combined</div>
                     </div>
-                    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-                        <button class="btn btn-secondary" id="refreshReportsBtn" title="Refresh list">
+                    <button class="btn btn-sm rpt-gen-btn" data-source="profiles"><i class="fas fa-file-export"></i> Generate</button>
+                </div>
+                <div class="rpt-gen-card" style="--accent:#fbbf24;">
+                    <div class="rpt-gen-icon"><i class="fas fa-gavel"></i></div>
+                    <div class="rpt-gen-info">
+                        <div class="rpt-gen-title">Appeal</div>
+                        <div class="rpt-gen-desc">Appeal submission results</div>
+                    </div>
+                    <button class="btn btn-sm rpt-gen-btn" data-source="appeal"><i class="fas fa-file-export"></i> Generate</button>
+                </div>
+                <div class="rpt-gen-card" style="--accent:#4ade80;">
+                    <div class="rpt-gen-icon"><i class="fas fa-heartbeat"></i></div>
+                    <div class="rpt-gen-info">
+                        <div class="rpt-gen-title">Health</div>
+                        <div class="rpt-gen-desc">Health activity results</div>
+                    </div>
+                    <button class="btn btn-sm rpt-gen-btn" data-source="health"><i class="fas fa-file-export"></i> Generate</button>
+                </div>
+                <div class="rpt-gen-card" style="--accent:#c084fc;">
+                    <div class="rpt-gen-icon"><i class="fas fa-shield-alt"></i></div>
+                    <div class="rpt-gen-info">
+                        <div class="rpt-gen-title">Step 2 — Security</div>
+                        <div class="rpt-gen-desc">Password, 2FA, recovery</div>
+                    </div>
+                    <button class="btn btn-sm rpt-gen-btn" data-source="step2"><i class="fas fa-file-export"></i> Generate</button>
+                </div>
+                <div class="rpt-gen-card" style="--accent:#f472b6;">
+                    <div class="rpt-gen-icon"><i class="fas fa-star"></i></div>
+                    <div class="rpt-gen-info">
+                        <div class="rpt-gen-title">Step 3 — Reviews</div>
+                        <div class="rpt-gen-desc">Google Maps review results</div>
+                    </div>
+                    <button class="btn btn-sm rpt-gen-btn" data-source="step3"><i class="fas fa-file-export"></i> Generate</button>
+                </div>
+                <div class="rpt-gen-card" style="--accent:#38bdf8;">
+                    <div class="rpt-gen-icon"><i class="fas fa-cog"></i></div>
+                    <div class="rpt-gen-info">
+                        <div class="rpt-gen-title">Step 1 — Language</div>
+                        <div class="rpt-gen-desc">Language & activity fix</div>
+                    </div>
+                    <button class="btn btn-sm rpt-gen-btn" data-source="step1"><i class="fas fa-file-export"></i> Generate</button>
+                </div>
+                <div class="rpt-gen-card" style="--accent:#fb923c;">
+                    <div class="rpt-gen-icon"><i class="fas fa-gavel"></i></div>
+                    <div class="rpt-gen-info">
+                        <div class="rpt-gen-title">Step 4 — Appeals</div>
+                        <div class="rpt-gen-desc">Account appeal output</div>
+                    </div>
+                    <button class="btn btn-sm rpt-gen-btn" data-source="step4"><i class="fas fa-file-export"></i> Generate</button>
+                </div>
+            </div>
+
+            <!-- Report History -->
+            <div class="card glass" style="margin-top:16px;">
+                <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
+                    <h3 style="margin:0;"><i class="fas fa-history" style="margin-right:6px;color:#94a3b8;"></i> Report History</h3>
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <button class="btn btn-secondary btn-sm" id="refreshReportsBtn" title="Refresh list">
                             <i class="fas fa-sync-alt"></i> Refresh
                         </button>
-                        <select id="reportTypeSelect" style="padding:8px 12px; border-radius:8px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.08); color:#fff; font-size:13px; min-width:200px;">
-                            <option value="profiles">All Profiles (Appeal + Health)</option>
-                            <option value="appeal">Appeal Report</option>
-                            <option value="health">Health Activity Report</option>
-                            <option value="step1">Step 1 — Language/Activity</option>
-                            <option value="step2">Step 2 — Security</option>
-                            <option value="step3">Step 3 — Maps/Reviews</option>
-                            <option value="step4">Step 4 — Appeals Output</option>
-                        </select>
-                        <button class="btn btn-primary" id="generateReportBtn" title="Generate report for the selected operation">
-                            <i class="fas fa-file-chart-line"></i> Generate Report
-                        </button>
-                        <button class="btn btn-danger" id="deleteAllReportsBtn">
+                        <button class="btn btn-danger btn-sm" id="deleteAllReportsBtn">
                             <i class="fas fa-trash-alt"></i> Delete All
                         </button>
                     </div>
                 </div>
-                <div id="reportsList" style="margin-top: 24px;">
-                    <!-- Reports injected here -->
-                    <div style="color: #666; font-style: italic;">No execution ledgers found.</div>
+                <div id="reportsList">
+                    <div style="color:#64748b; font-style:italic; padding:20px 0;">No reports yet. Generate one above.</div>
                 </div>
             </div>
 
             <!-- XLS Template Generator -->
-            <div class="card glass" style="margin-top: 20px;">
+            <div class="card glass" style="margin-top:16px;">
                 <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
                     <div>
-                        <h3><i class="fas fa-file-download"></i> XLS Template Generator</h3>
-                        <p class="card-subtitle">Generate a blank Excel template with the required columns for each step.</p>
+                        <h3 style="margin:0;"><i class="fas fa-file-download" style="margin-right:6px;color:#94a3b8;"></i> Template Generator</h3>
+                        <p class="card-subtitle" style="margin-top:4px;">Blank Excel template with required columns.</p>
                     </div>
                     <div style="display:flex; gap:8px; align-items:center;">
                         <select id="templateStepSelect" style="padding:8px 12px; border-radius:8px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.08); color:#fff; font-size:13px;">
                             <option value="1">Step 1 - Language/Activity</option>
-                            <option value="2">Step 2 - Security/Modification</option>
+                            <option value="2">Step 2 - Security</option>
                             <option value="3">Step 3 - Maps Reviews</option>
-                            <option value="4">Step 4 - Account Appeals</option>
+                            <option value="4">Step 4 - Appeals</option>
                         </select>
-                        <button class="btn btn-primary" id="generateTemplateBtn">
-                            <i class="fas fa-file-download"></i> Generate Template
+                        <button class="btn btn-primary btn-sm" id="generateTemplateBtn">
+                            <i class="fas fa-file-download"></i> Generate
                         </button>
                     </div>
                 </div>
