@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MailNexus Pro - Admin Panel</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#0f1117;color:#e2e8f0;min-height:100vh}
+.header{background:#1a1d29;border-bottom:1px solid #2d3348;padding:16px 32px;display:flex;align-items:center;gap:16px}
+.header h1{font-size:20px;font-weight:600;color:#fff}
+.header .badge{background:#3b82f6;color:#fff;font-size:11px;padding:3px 10px;border-radius:12px}
+.container{max-width:1100px;margin:0 auto;padding:24px}
+.tabs{display:flex;gap:8px;margin-bottom:24px;border-bottom:1px solid #2d3348;padding-bottom:12px}
+.tab{padding:8px 20px;border-radius:8px;cursor:pointer;font-size:14px;color:#94a3b8;background:transparent;border:none;transition:all .2s}
+.tab:hover{color:#e2e8f0;background:#1e2235}
+.tab.active{color:#3b82f6;background:#1e2235;font-weight:600}
+.panel{display:none}
+.panel.active{display:block}
+.card{background:#1a1d29;border:1px solid #2d3348;border-radius:12px;padding:24px;margin-bottom:20px}
+.card h2{font-size:16px;margin-bottom:16px;color:#fff}
+.row{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:12px;color:#94a3b8}
+.field input,.field select{background:#0f1117;border:1px solid #2d3348;color:#e2e8f0;padding:8px 12px;border-radius:6px;font-size:14px;width:160px}
+.btn{padding:8px 20px;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;display:inline-flex;align-items:center;gap:6px}
+.btn-primary{background:#3b82f6;color:#fff}
+.btn-primary:hover{background:#2563eb}
+.btn-danger{background:#ef4444;color:#fff}
+.btn-danger:hover{background:#dc2626}
+.btn-success{background:#22c55e;color:#fff}
+.btn-success:hover{background:#16a34a}
+.btn-sm{padding:5px 12px;font-size:12px}
+.btn-ghost{background:transparent;border:1px solid #2d3348;color:#94a3b8}
+.btn-ghost:hover{border-color:#3b82f6;color:#3b82f6}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;font-size:12px;color:#64748b;padding:8px 12px;border-bottom:1px solid #2d3348;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+td{padding:10px 12px;border-bottom:1px solid rgba(45,51,72,0.5);font-size:13px}
+tr:hover{background:rgba(59,130,246,0.05)}
+.key-cell{font-family:'Courier New',monospace;font-size:13px;letter-spacing:.5px;color:#60a5fa;cursor:pointer}
+.key-cell:hover{color:#93bbfc}
+.status{display:inline-block;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:600}
+.status-active{background:rgba(34,197,94,0.15);color:#4ade80}
+.status-revoked{background:rgba(239,68,68,0.15);color:#f87171}
+.status-expired{background:rgba(251,191,36,0.15);color:#fbbf24}
+.toast{position:fixed;top:20px;right:20px;padding:12px 20px;border-radius:8px;font-size:13px;z-index:999;animation:slideIn .3s ease;max-width:400px}
+.toast-success{background:#166534;color:#4ade80;border:1px solid #22c55e}
+.toast-error{background:#7f1d1d;color:#fca5a5;border:1px solid #ef4444}
+@keyframes slideIn{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:translateX(0)}}
+.empty{text-align:center;padding:40px;color:#475569}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+.stat-card{background:#1a1d29;border:1px solid #2d3348;border-radius:10px;padding:16px;text-align:center}
+.stat-num{font-size:28px;font-weight:700;color:#fff}
+.stat-label{font-size:12px;color:#64748b;margin-top:4px}
+.gist-url{font-family:'Courier New',monospace;font-size:12px;background:#0f1117;padding:8px 12px;border-radius:6px;border:1px solid #2d3348;word-break:break-all;margin-top:8px;color:#60a5fa}
+.copy-msg{font-size:11px;color:#4ade80;margin-left:8px;display:none}
+</style>
+</head>
+<body>
+
+<div class="header">
+    <h1>MailNexus Pro</h1>
+    <span class="badge">Admin Panel</span>
+</div>
+
+<div class="container">
+    <div class="stats" id="stats">
+        <div class="stat-card"><div class="stat-num" id="statTotal">0</div><div class="stat-label">Total Licenses</div></div>
+        <div class="stat-card"><div class="stat-num" id="statActive" style="color:#4ade80">0</div><div class="stat-label">Active</div></div>
+        <div class="stat-card"><div class="stat-num" id="statRevoked" style="color:#f87171">0</div><div class="stat-label">Revoked</div></div>
+        <div class="stat-card"><div class="stat-num" id="statExpired" style="color:#fbbf24">0</div><div class="stat-label">Expired</div></div>
+    </div>
+
+    <div class="tabs">
+        <button class="tab active" onclick="switchTab('licenses')">Licenses</button>
+        <button class="tab" onclick="switchTab('generate')">Generate Key</button>
+        <button class="tab" onclick="switchTab('version')">Version</button>
+        <button class="tab" onclick="switchTab('settings')">Settings</button>
+    </div>
+
+    <!-- Licenses Panel -->
+    <div class="panel active" id="panel-licenses">
+        <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+                <h2 style="margin-bottom:0">All Licenses</h2>
+                <button class="btn btn-primary btn-sm" onclick="syncGist()">Sync to Gist</button>
+            </div>
+            <table>
+                <thead><tr><th>ID</th><th>License Key</th><th>Tier</th><th>Days</th><th>Created</th><th>Expiry</th><th>Status</th><th>Actions</th></tr></thead>
+                <tbody id="licenseTable"></tbody>
+            </table>
+            <div class="empty" id="emptyMsg">No licenses generated yet. Go to "Generate Key" tab.</div>
+        </div>
+    </div>
+
+    <!-- Generate Panel -->
+    <div class="panel" id="panel-generate">
+        <div class="card">
+            <h2>Generate New License Key</h2>
+            <div class="row">
+                <div class="field">
+                    <label>Validity (days)</label>
+                    <input type="number" id="genDays" value="30" min="0" max="4095">
+                </div>
+                <div class="field">
+                    <label>Tier</label>
+                    <select id="genTier">
+                        <option value="pro" selected>Pro (Steps 1-4)</option>
+                        <option value="basic">Basic (Steps 1-2)</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label>Count</label>
+                    <input type="number" id="genCount" value="1" min="1" max="50">
+                </div>
+                <button class="btn btn-primary" onclick="generateKeys()">Generate</button>
+            </div>
+            <p style="font-size:12px;color:#64748b;margin-top:8px">Days = 0 means lifetime license</p>
+        </div>
+        <div class="card" id="genResult" style="display:none">
+            <h2>Generated Keys</h2>
+            <div id="genResultBody"></div>
+        </div>
+    </div>
+
+    <!-- Version Panel -->
+    <div class="panel" id="panel-version">
+        <div class="card">
+            <h2>Publish New Version</h2>
+            <p style="font-size:13px;color:#94a3b8;margin-bottom:16px">
+                When you release a new version, fill in the details below and click "Save & Push to Gist".
+                All users will see an update notification on their next startup.
+            </p>
+            <div class="row">
+                <div class="field">
+                    <label>Version Number</label>
+                    <input type="text" id="vmVersion" placeholder="3.1.0" style="width:120px">
+                </div>
+                <div class="field">
+                    <label>Release Date</label>
+                    <input type="date" id="vmDate" style="width:160px">
+                </div>
+                <div class="field">
+                    <label>Type</label>
+                    <select id="vmType" style="width:120px">
+                        <option value="patch">Patch</option>
+                        <option value="minor">Minor</option>
+                        <option value="major">Major</option>
+                    </select>
+                </div>
+            </div>
+            <div class="row" style="margin-top:12px">
+                <div class="field" style="flex:1">
+                    <label>Download URL</label>
+                    <input type="text" id="vmDownloadUrl" placeholder="https://github.com/mdnishath/mailexus-advanced/releases" style="width:100%">
+                </div>
+            </div>
+            <div style="margin-top:12px">
+                <label style="font-size:12px;color:#94a3b8;display:block;margin-bottom:4px">Changes (one per line)</label>
+                <textarea id="vmChanges" rows="4" style="width:100%;background:#0f1117;border:1px solid #2d3348;color:#e2e8f0;padding:8px 12px;border-radius:6px;font-size:13px;font-family:inherit;resize:vertical" placeholder="Fixed login bug&#10;Added new feature&#10;Improved performance"></textarea>
+            </div>
+            <div style="margin-top:12px">
+                <label style="font-size:12px;color:#94a3b8;display:block;margin-bottom:4px">Migration Notes (optional — shown as a warning to users)</label>
+                <input type="text" id="vmMigration" placeholder="Re-activate your license after updating" style="width:100%;background:#0f1117;border:1px solid #2d3348;color:#e2e8f0;padding:8px 12px;border-radius:6px;font-size:14px">
+            </div>
+            <div style="margin-top:16px;display:flex;gap:10px">
+                <button class="btn btn-primary" onclick="pushVersionManifest()">Save & Push to Gist</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Current Version Manifest</h2>
+            <div id="vmCurrentInfo" style="color:#64748b;font-size:13px">Loading...</div>
+            <div id="vmChangelog" style="margin-top:16px"></div>
+        </div>
+    </div>
+
+    <!-- Settings Panel -->
+    <div class="panel" id="panel-settings">
+        <div class="card">
+            <h2>GitHub Gist Setup</h2>
+            <p style="font-size:13px;color:#94a3b8;margin-bottom:16px">
+                Connect a GitHub Gist so you can revoke licenses remotely.
+                Customer apps check this Gist on startup.
+            </p>
+            <div id="gistStatus"></div>
+            <div style="margin-top:16px">
+                <div class="row">
+                    <div class="field">
+                        <label>GitHub Token (gist scope)</label>
+                        <input type="password" id="gistToken" style="width:320px" placeholder="ghp_xxxxxxxxxxxx">
+                    </div>
+                </div>
+                <div class="row" style="margin-top:10px">
+                    <div class="field">
+                        <label>Gist ID (leave empty to auto-create)</label>
+                        <input type="text" id="gistId" style="width:320px" placeholder="4781b52137098ddced727568fa31be7a" value="4781b52137098ddced727568fa31be7a">
+                    </div>
+                </div>
+                <div style="margin-top:12px">
+                    <button class="btn btn-primary" onclick="setupGist()">Save & Connect</button>
+                </div>
+            </div>
+            <p style="font-size:12px;color:#64748b;margin-top:8px">
+                Get token: <a href="https://github.com/settings/tokens/new" target="_blank" style="color:#3b82f6">github.com/settings/tokens/new</a> (select "gist" scope)
+            </p>
+        </div>
+    </div>
+</div>
+
+<script>
+const API = '';
+
+function switchTab(name) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    event.target.classList.add('active');
+    document.getElementById('panel-' + name).classList.add('active');
+    if (name === 'licenses') loadLicenses();
+    if (name === 'settings') loadGistStatus();
+    if (name === 'version') loadVersionManifest();
+}
+
+function toast(msg, type) {
+    const t = document.createElement('div');
+    t.className = 'toast toast-' + type;
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 3000);
+}
+
+function copyKey(key) {
+    navigator.clipboard.writeText(key).then(() => toast('Key copied!', 'success'));
+}
+
+async function loadLicenses() {
+    const res = await fetch(API + '/api/licenses');
+    const data = await res.json();
+    const list = data.licenses || [];
+    const tbody = document.getElementById('licenseTable');
+    const empty = document.getElementById('emptyMsg');
+
+    let total = list.length, active = 0, revoked = 0, expired = 0;
+
+    if (list.length === 0) {
+        tbody.innerHTML = '';
+        empty.style.display = '';
+    } else {
+        empty.style.display = 'none';
+        tbody.innerHTML = list.reverse().map(l => {
+            let status, statusClass;
+            if (l.revoked) { status = 'Revoked'; statusClass = 'status-revoked'; revoked++; }
+            else if (l.expired) { status = 'Expired'; statusClass = 'status-expired'; expired++; }
+            else { status = 'Active'; statusClass = 'status-active'; active++; }
+
+            const days = l.days === 0 ? 'Lifetime' : l.days + 'd';
+            const tier = (l.tier || 'pro').toUpperCase();
+            const tierColor = l.tier === 'basic' ? '#60a5fa' : '#c084fc';
+            return '<tr>' +
+                '<td>#' + l.id + '</td>' +
+                '<td class="key-cell" onclick="copyKey(\'' + l.key + '\')" title="Click to copy">' + l.key + '</td>' +
+                '<td><span style="color:' + tierColor + ';font-weight:600;font-size:11px">' + tier + '</span></td>' +
+                '<td>' + days + '</td>' +
+                '<td>' + l.created + '</td>' +
+                '<td>' + (l.expiry || '-') + '</td>' +
+                '<td><span class="status ' + statusClass + '">' + status + '</span></td>' +
+                '<td>' +
+                    (l.revoked
+                        ? '<button class="btn btn-success btn-sm" onclick="unrevokeL(' + l.id + ')">Restore</button> '
+                        : '<button class="btn btn-danger btn-sm" onclick="revokeL(' + l.id + ')">Revoke</button> '
+                    ) +
+                    '<button class="btn btn-ghost btn-sm" onclick="deleteL(' + l.id + ')">Delete</button>' +
+                '</td></tr>';
+        }).join('');
+    }
+
+    document.getElementById('statTotal').textContent = total;
+    document.getElementById('statActive').textContent = active;
+    document.getElementById('statRevoked').textContent = revoked;
+    document.getElementById('statExpired').textContent = expired;
+}
+
+async function generateKeys() {
+    const days = parseInt(document.getElementById('genDays').value) || 30;
+    const count = parseInt(document.getElementById('genCount').value) || 1;
+    const tier = document.getElementById('genTier').value;
+
+    const res = await fetch(API + '/api/generate', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({days, count, tier})
+    });
+    const data = await res.json();
+    if (data.error) { toast(data.error, 'error'); return; }
+
+    const result = document.getElementById('genResult');
+    const body = document.getElementById('genResultBody');
+    result.style.display = '';
+
+    body.innerHTML = data.generated.map(l => {
+        const t = (l.tier || 'pro').toUpperCase();
+        const tc = l.tier === 'basic' ? '#60a5fa' : '#c084fc';
+        return '<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid #2d3348">' +
+        '<span style="color:#64748b">#' + l.id + '</span>' +
+        '<span style="color:' + tc + ';font-weight:600;font-size:11px">' + t + '</span>' +
+        '<span class="key-cell" onclick="copyKey(\'' + l.key + '\')" style="flex:1">' + l.key + '</span>' +
+        '<span style="color:#64748b">' + (l.days === 0 ? 'Lifetime' : l.days + ' days') + '</span>' +
+        '<button class="btn btn-ghost btn-sm" onclick="copyKey(\'' + l.key + '\')">Copy</button>' +
+        '</div>';
+    }).join('');
+
+    toast(count + ' key(s) generated!', 'success');
+    loadLicenses();
+}
+
+async function revokeL(id) {
+    if (!confirm('Revoke license #' + id + '?')) return;
+    const res = await fetch(API + '/api/revoke', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({id})
+    });
+    const data = await res.json();
+    if (data.synced) toast('License #' + id + ' revoked & synced!', 'success');
+    else toast('Revoked locally. Gist sync: ' + data.message, 'error');
+    loadLicenses();
+}
+
+async function unrevokeL(id) {
+    const res = await fetch(API + '/api/unrevoke', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({id})
+    });
+    const data = await res.json();
+    if (data.synced) toast('License #' + id + ' restored & synced!', 'success');
+    else toast('Restored locally. Gist sync: ' + data.message, 'error');
+    loadLicenses();
+}
+
+async function deleteL(id) {
+    if (!confirm('Delete license #' + id + ' from list?')) return;
+    await fetch(API + '/api/delete-license', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({id})
+    });
+    toast('License #' + id + ' deleted', 'success');
+    loadLicenses();
+}
+
+async function loadGistStatus() {
+    const res = await fetch(API + '/api/gist-status');
+    const data = await res.json();
+    const el = document.getElementById('gistStatus');
+    if (data.configured) {
+        el.innerHTML = '<div style="color:#4ade80;margin-bottom:8px">Connected</div>' +
+            '<div style="font-size:12px;color:#64748b">Gist ID: ' + data.gist_id + '</div>' +
+            (data.raw_url ? '<div class="gist-url">' + data.raw_url + '</div>' : '');
+    } else {
+        el.innerHTML = '<div style="color:#fbbf24">Not configured</div>';
+    }
+}
+
+async function setupGist() {
+    const token = document.getElementById('gistToken').value.trim();
+    const gist_id = document.getElementById('gistId').value.trim();
+    if (!token) { toast('Enter your GitHub token', 'error'); return; }
+    const res = await fetch(API + '/api/setup-gist', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({token, gist_id})
+    });
+    const data = await res.json();
+    if (data.error) { toast(data.error, 'error'); return; }
+    if (data.synced) {
+        toast('Connected & synced!', 'success');
+    } else {
+        toast('Token saved. Sync: ' + (data.sync_msg || 'unknown'), 'error');
+    }
+    document.getElementById('gistToken').value = '';
+    loadGistStatus();
+}
+
+async function syncGist() {
+    const res = await fetch(API + '/api/sync-gist', { method: 'POST' });
+    const data = await res.json();
+    if (data.synced) {
+        toast('Synced to Gist! Revoked: [' + (data.revoked || []).join(', ') + ']', 'success');
+    } else {
+        toast('Sync failed: ' + (data.message || 'Unknown error'), 'error');
+    }
+}
+
+// ── Version Manifest ──────────────────────────────────────
+async function loadVersionManifest() {
+    try {
+        const res = await fetch(API + '/api/version-manifest');
+        const data = await res.json();
+
+        // Populate form defaults
+        document.getElementById('vmVersion').value = data.latest_version || '';
+        document.getElementById('vmDownloadUrl').value = data.download_url || '';
+        document.getElementById('vmDate').value = data.release_date || new Date().toISOString().split('T')[0];
+
+        // Current info
+        document.getElementById('vmCurrentInfo').innerHTML =
+            '<span style="color:#fff;font-weight:600">Latest Published:</span> v' + (data.latest_version || '?') +
+            ' &nbsp;&middot;&nbsp; ' + (data.release_date || '—') +
+            (data.download_url ? ' &nbsp;&middot;&nbsp; <a href="' + data.download_url + '" target="_blank" style="color:#3b82f6">Download</a>' : '');
+
+        // Changelog
+        const cl = data.changelog || [];
+        const clEl = document.getElementById('vmChangelog');
+        if (cl.length === 0) {
+            clEl.innerHTML = '<div style="color:#475569">No changelog entries yet.</div>';
+        } else {
+            clEl.innerHTML = cl.map(function(entry) {
+                var typeColor = entry.type === 'major' ? '#ef4444' : entry.type === 'minor' ? '#f59e0b' : '#22c55e';
+                var html = '<div style="padding:12px 0;border-bottom:1px solid #2d3348">' +
+                    '<span style="font-size:11px;font-weight:700;color:' + typeColor + ';text-transform:uppercase">' + (entry.type || 'patch') + '</span> ' +
+                    '<span style="font-size:14px;font-weight:600;color:#fff">v' + entry.version + '</span>' +
+                    '<span style="font-size:12px;color:#64748b;margin-left:10px">' + (entry.date || '') + '</span>';
+                if (entry.changes && entry.changes.length) {
+                    html += '<ul style="margin:6px 0 0 16px;padding:0;list-style:disc">';
+                    entry.changes.forEach(function(c) {
+                        html += '<li style="font-size:12px;color:#94a3b8;margin-bottom:2px">' + c + '</li>';
+                    });
+                    html += '</ul>';
+                }
+                if (entry.migration) {
+                    html += '<div style="margin-top:6px;padding:6px 10px;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:6px;font-size:12px;color:#fbbf24">' +
+                        '⚠ Migration: ' + entry.migration + '</div>';
+                }
+                html += '</div>';
+                return html;
+            }).join('');
+        }
+    } catch(e) {
+        document.getElementById('vmCurrentInfo').textContent = 'Failed to load manifest.';
+    }
+}
+
+async function pushVersionManifest() {
+    var version = document.getElementById('vmVersion').value.trim();
+    var download_url = document.getElementById('vmDownloadUrl').value.trim();
+    var release_date = document.getElementById('vmDate').value.trim();
+    var type = document.getElementById('vmType').value;
+    var changesRaw = document.getElementById('vmChanges').value.trim();
+    var migration = document.getElementById('vmMigration').value.trim();
+
+    if (!version) { toast('Version number is required', 'error'); return; }
+    if (!changesRaw) { toast('Add at least one change', 'error'); return; }
+
+    var changes = changesRaw.split('\n').map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 0; });
+
+    var res = await fetch(API + '/api/update-version-manifest', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ latest_version: version, download_url: download_url, release_date: release_date, type: type, changes: changes, migration: migration })
+    });
+    var data = await res.json();
+
+    if (data.error) { toast(data.error, 'error'); return; }
+    if (data.synced) {
+        toast('v' + version + ' published & synced to Gist!', 'success');
+    } else {
+        toast('Saved locally. Gist sync: ' + (data.message || 'failed'), 'error');
+    }
+
+    // Clear changes textarea and migration for next entry
+    document.getElementById('vmChanges').value = '';
+    document.getElementById('vmMigration').value = '';
+
+    loadVersionManifest();
+}
+
+// Initial load
+loadLicenses();
+</script>
+</body>
+</html>
