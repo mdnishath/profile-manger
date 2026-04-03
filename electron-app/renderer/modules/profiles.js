@@ -2061,6 +2061,19 @@
             document.querySelectorAll('#healthModal .health-act-item input[type="checkbox"]').forEach(cb => cb.checked = false);
             _updateHealthCount();
         });
+        _btn('healthRandomPick', () => {
+            const countInput = document.getElementById('healthRandomCount');
+            const n = Math.max(1, parseInt(countInput ? countInput.value : '5') || 5);
+            const allCbs = Array.from(document.querySelectorAll('#healthModal .health-act-item input[type="checkbox"]'));
+            // Uncheck all first
+            allCbs.forEach(cb => cb.checked = false);
+            // Shuffle and pick N
+            const shuffled = allCbs.sort(() => Math.random() - 0.5);
+            const pick = Math.min(n, shuffled.length);
+            for (let i = 0; i < pick; i++) shuffled[i].checked = true;
+            _updateHealthCount();
+            App.toast(`Randomly picked ${pick} activities`, 'info');
+        });
         _btn('healthProfileSelectAll', () => {
             // Only select profiles visible in current filter (group + search)
             _filteredHealth().forEach(p => _healthChecked.add(p.id));
