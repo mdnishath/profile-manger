@@ -646,7 +646,7 @@ def create_profile(name: str, email: str = '', proxy: dict | None = None,
                    password: str = '', totp_secret: str = '',
                    backup_codes: list | None = None,
                    frontend_sections: dict | None = None,
-                   engine: str = 'nexus') -> dict:
+                   engine: str = 'nexus', address: str = '') -> dict:
     """Create a local profile launched with NST's nstchrome binary.
 
     Args:
@@ -980,6 +980,7 @@ def create_profile(name: str, email: str = '', proxy: dict | None = None,
             'password': password or '',
             'totp_secret': totp_secret or '',
             'backup_codes': backup_codes or [],
+            'address': address or '',
         }
         profiles.append(profile)
         _write_profiles(profiles)
@@ -1000,7 +1001,7 @@ def update_profile(profile_id: str, **fields) -> dict | None:
                 allowed = {
                     'name', 'email', 'proxy', 'notes', 'status', 'group', 'groups', 'tags',
                     'overview', 'hardware', 'advanced', 'fingerprint',
-                    'password', 'totp_secret', 'backup_codes',
+                    'password', 'totp_secret', 'backup_codes', 'address',
                     'fingerprint_prefs', 'engine', 'startup_urls',
                 }
 

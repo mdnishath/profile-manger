@@ -1034,12 +1034,18 @@ def batch_login(file_path: str, num_workers: int = 3,
         if proxy_str and proxy_str.lower() != 'nan':
             proxy_data = _parse_proxy_string(proxy_str)
 
+        # Read Address column if present
+        address = str(row.get('Address', '')).strip()
+        if address.lower() == 'nan':
+            address = ''
+
         accounts.append({
             'email': email,
             'password': password,
             'totp_secret': totp_secret if totp_secret != 'nan' else '',
             'backup_codes': bc_list,
             'proxy': proxy_data,  # None if not in Excel
+            'address': address,
         })
 
     if not accounts:
@@ -1150,6 +1156,7 @@ def _batch_login_worker(accounts: list[dict], num_workers: int,
             password=account.get('password', ''),
             totp_secret=account.get('totp_secret', ''),
             backup_codes=account.get('backup_codes', []),
+            address=account.get('address', ''),
         )
         profile_id = profile['id']
         # Set group via nexus_profile_manager (correct storage path)
@@ -4206,6 +4213,9 @@ async def _run_health_for_profile(profile: dict, worker_id: int,
                                    activities: list, country: str = 'US',
                                    rounds: int = 1, gmb_name: str = '',
                                    gmb_address: str = '') -> dict:
+    # Use profile's saved address as fallback for GMB activity
+    if not gmb_address and profile.get('address'):
+        gmb_address = profile['address']
     """Launch browser via NST API (NST profiles) or StealthChrome (local),
     run health activities, close browser. NO signout — session stays alive."""
     from playwright.async_api import async_playwright
