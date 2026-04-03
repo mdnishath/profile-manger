@@ -1121,8 +1121,18 @@
                 <h3><i class="fas fa-heartbeat" style="color:#22c55e;margin-right:8px;"></i>Health Activity</h3>
                 <button class="pm-modal-close" id="healthModalClose">&times;</button>
             </div>
-            <div style="padding:10px 20px;border-bottom:1px solid var(--border);display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:#0e0e0e;">
-                <span style="font-size:12px;color:#94a3b8;flex:1;">Select profiles &amp; activities. Activities run in random order to bypass detection.</span>
+            <!-- Mode Toggle: Smart vs Manual -->
+            <div style="padding:8px 20px;border-bottom:1px solid var(--border);display:flex;gap:8px;align-items:center;background:#0e0e0e;">
+                <button class="btn btn-sm health-mode-btn active" id="healthModeSmartBtn" data-mode="smart"
+                    style="background:rgba(34,197,94,0.15);color:#4ade80;border:1px solid rgba(34,197,94,0.4);font-size:11px;padding:5px 14px;">
+                    <i class="fas fa-brain"></i> Smart (Recommended)
+                </button>
+                <button class="btn btn-sm health-mode-btn" id="healthModeManualBtn" data-mode="manual"
+                    style="background:rgba(255,255,255,0.04);color:#94a3b8;border:1px solid rgba(255,255,255,0.1);font-size:11px;padding:5px 14px;">
+                    <i class="fas fa-sliders-h"></i> Manual
+                </button>
+                <div style="flex:1;"></div>
+                <span style="font-size:11px;color:#475569;">Activities run in random order with human-like delays</span>
             </div>
             <div style="padding:8px 20px;border-bottom:1px solid var(--border);">
                 <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:0;padding:10px 14px;background:rgba(255,255,255,0.04);border-radius:8px;border:1px solid rgba(255,255,255,0.08);">
@@ -1162,7 +1172,12 @@
                     </div>
                     <div style="display:flex;align-items:center;gap:8px;">
                         <label style="font-size:12px;color:#94a3b8;white-space:nowrap;">Rounds:</label>
-                        <input type="number" id="healthRounds" value="1" min="1" max="10" title="How many times to repeat all selected activities per profile" style="width:56px;background:#1a1a1a;color:#e2e8f0;border:1px solid rgba(255,255,255,0.12);border-radius:6px;padding:4px 8px;font-size:12px;text-align:center;">
+                        <input type="number" id="healthRounds" value="1" min="1" max="10" title="Repeat all activities N times" style="width:56px;background:#1a1a1a;color:#e2e8f0;border:1px solid rgba(255,255,255,0.12);border-radius:6px;padding:4px 8px;font-size:12px;text-align:center;">
+                    </div>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <label style="font-size:12px;color:#94a3b8;white-space:nowrap;">Duration:</label>
+                        <input type="number" id="healthDuration" value="0" min="0" max="120" title="Min minutes per profile. 0 = no time limit (just finish activities). If activities finish early, random ones fill remaining time." style="width:56px;background:#1a1a1a;color:#e2e8f0;border:1px solid rgba(255,255,255,0.12);border-radius:6px;padding:4px 8px;font-size:12px;text-align:center;">
+                        <span style="font-size:10px;color:#475569;">min</span>
                     </div>
                 </div>
             </div>
@@ -1192,6 +1207,91 @@
 
                 <!-- RIGHT: Activities -->
                 <div style="flex:1;overflow-y:auto;padding:14px 16px;">
+
+                    <!-- ═══ SMART MODE PANEL ═══ -->
+                    <div id="healthSmartPanel">
+                        <div style="background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.2);border-radius:10px;padding:14px 16px;margin-bottom:14px;">
+                            <div style="font-size:12px;font-weight:700;color:#4ade80;margin-bottom:10px;"><i class="fas fa-brain" style="margin-right:6px;"></i> Smart Activity — Select Your Goal</div>
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                                <label class="health-smart-goal" style="--accent:#22c55e;">
+                                    <input type="radio" name="healthSmartGoal" value="gmail_trust" checked>
+                                    <div class="health-smart-card">
+                                        <i class="fas fa-shield-alt"></i>
+                                        <div>
+                                            <strong>Gmail Trust</strong>
+                                            <span>Build account trust score — Search, Gmail, YouTube, Maps, Drive, Account settings</span>
+                                        </div>
+                                    </div>
+                                </label>
+                                <label class="health-smart-goal" style="--accent:#f59e0b;">
+                                    <input type="radio" name="healthSmartGoal" value="review_ready">
+                                    <div class="health-smart-card">
+                                        <i class="fas fa-star"></i>
+                                        <div>
+                                            <strong>Review Ready</strong>
+                                            <span>Prepare for posting reviews — Maps, local search, reviews, photos, business browsing</span>
+                                        </div>
+                                    </div>
+                                </label>
+                                <label class="health-smart-goal" style="--accent:#8b5cf6;">
+                                    <input type="radio" name="healthSmartGoal" value="review_sticky">
+                                    <div class="health-smart-card">
+                                        <i class="fas fa-thumbtack"></i>
+                                        <div>
+                                            <strong>Review Sticky</strong>
+                                            <span>After posting review — heavy Maps + local activity to make review stick</span>
+                                        </div>
+                                    </div>
+                                </label>
+                                <label class="health-smart-goal" style="--accent:#3b82f6;">
+                                    <input type="radio" name="healthSmartGoal" value="full_warmup">
+                                    <div class="health-smart-card">
+                                        <i class="fas fa-fire"></i>
+                                        <div>
+                                            <strong>Full Warmup</strong>
+                                            <span>Maximum trust — all Google services, long sessions, deep browsing</span>
+                                        </div>
+                                    </div>
+                                </label>
+                                <label class="health-smart-goal" style="--accent:#06b6d4;">
+                                    <input type="radio" name="healthSmartGoal" value="local_presence">
+                                    <div class="health-smart-card">
+                                        <i class="fas fa-map-marker-alt"></i>
+                                        <div>
+                                            <strong>Local Presence</strong>
+                                            <span>Build local authority — Maps, local search, nearby businesses, directions</span>
+                                        </div>
+                                    </div>
+                                </label>
+                                <label class="health-smart-goal" style="--accent:#ec4899;">
+                                    <input type="radio" name="healthSmartGoal" value="social_engage">
+                                    <div class="health-smart-card">
+                                        <i class="fas fa-users"></i>
+                                        <div>
+                                            <strong>Social Engage</strong>
+                                            <span>YouTube watch + comment, News reading, Shopping — social signals</span>
+                                        </div>
+                                    </div>
+                                </label>
+                            </div>
+                            <div style="margin-top:12px;font-size:11px;color:#64748b;display:flex;align-items:center;gap:8px;">
+                                <i class="fas fa-info-circle"></i>
+                                Smart mode auto-selects the best activities, duration, and order for your goal. Set duration above (recommended: 5-15 min).
+                            </div>
+                        </div>
+                        <!-- GMB for Smart mode -->
+                        <div style="background:rgba(139,92,246,0.06);border:1px solid rgba(139,92,246,0.2);border-radius:8px;padding:10px 12px;margin-bottom:14px;">
+                            <div style="font-size:11px;font-weight:700;color:#a78bfa;margin-bottom:6px;"><i class="fas fa-map-marker-alt" style="margin-right:4px;"></i> Target Business (optional)</div>
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+                                <input type="text" id="healthSmartGmbName" placeholder="Business name" style="background:#1a1a1a;color:#e2e8f0;border:1px solid rgba(139,92,246,0.3);border-radius:6px;padding:5px 10px;font-size:12px;">
+                                <input type="text" id="healthSmartGmbAddress" placeholder="Address / city" style="background:#1a1a1a;color:#e2e8f0;border:1px solid rgba(139,92,246,0.3);border-radius:6px;padding:5px 10px;font-size:12px;">
+                            </div>
+                            <div style="font-size:10px;color:#64748b;margin-top:4px;">Activities will focus around this business and location. Uses profile address if empty.</div>
+                        </div>
+                    </div>
+
+                    <!-- ═══ MANUAL MODE PANEL ═══ -->
+                    <div id="healthManualPanel" style="display:none;">
                     <!-- Custom GMB Activity -->
                     <div style="background:rgba(139,92,246,0.06);border:1px solid rgba(139,92,246,0.2);border-radius:8px;padding:10px 12px;margin-bottom:14px;">
                         <div style="font-size:11px;font-weight:700;color:#a78bfa;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px;"><i class="fas fa-map-marker-alt" style="margin-right:4px;"></i> Custom GMB Activity</div>
@@ -1423,6 +1523,7 @@
                             <label class="health-act-item"><input type="checkbox" value="sites_browse"> Google Sites</label>
                         </div>
                     </div>
+                    </div><!-- end healthManualPanel -->
                 </div><!-- end right activities -->
             </div><!-- end split -->
 

@@ -357,6 +357,39 @@ select option { background: #1a1a2e; color: #fff; }
 .tag-signout { background: rgba(248,113,113,0.15); color: #f87171; border: 1px solid rgba(248,113,113,0.3); }
 .log-entry.warning .msg { color: var(--warning); }
 
+/* Health Smart Activity Cards */
+.health-smart-goal { cursor: pointer; display: block; }
+.health-smart-goal input { display: none; }
+.health-smart-card {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 10px 12px; border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(255,255,255,0.02);
+    transition: border-color 0.15s, background 0.15s;
+}
+.health-smart-card i {
+    font-size: 16px; margin-top: 2px; flex-shrink: 0;
+    color: var(--accent, #94a3b8); opacity: 0.6;
+}
+.health-smart-card strong {
+    display: block; font-size: 12px; color: #e2e8f0; margin-bottom: 2px;
+}
+.health-smart-card span {
+    display: block; font-size: 10px; color: #64748b; line-height: 1.3;
+}
+.health-smart-goal input:checked + .health-smart-card {
+    border-color: var(--accent, #22c55e);
+    background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+.health-smart-goal input:checked + .health-smart-card i { opacity: 1; }
+
+/* Health Mode Buttons */
+.health-mode-btn.active {
+    background: rgba(34,197,94,0.15) !important;
+    color: #4ade80 !important;
+    border-color: rgba(34,197,94,0.4) !important;
+}
+
 /* Report Section Headers */
 .rpt-section-header {
     display: flex; align-items: center; gap: 8px;

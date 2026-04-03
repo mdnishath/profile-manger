@@ -2799,8 +2799,9 @@ def stop_health() -> dict:
 
 def run_health_activity(num_workers: int = 3, activities: list = None,
                         profile_ids: list = None, country: str = 'US',
-                        rounds: int = 1, gmb_name: str = '',
-                        gmb_address: str = '', **kwargs) -> dict:
+                        rounds: int = 1, duration_minutes: int = 0,
+                        gmb_name: str = '', gmb_address: str = '',
+                        **kwargs) -> dict:
     from shared import profile_manager as _old_pm
     _sync_state_to_old(_old_pm)
     return _old_pm.run_health_activity(
@@ -2809,6 +2810,7 @@ def run_health_activity(num_workers: int = 3, activities: list = None,
         profile_ids=profile_ids,
         country=country,
         rounds=rounds,
+        duration_minutes=duration_minutes,
         gmb_name=gmb_name,
         gmb_address=gmb_address,
     )

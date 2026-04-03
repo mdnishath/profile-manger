@@ -4004,7 +4004,8 @@ _health_status: dict = {}
 
 def run_health_activity(num_workers: int = 3, activities: list = None,
                         profile_ids: list = None, country: str = 'US',
-                        rounds: int = 1, gmb_name: str = '', gmb_address: str = '') -> dict:
+                        rounds: int = 1, duration_minutes: int = 0,
+                        gmb_name: str = '', gmb_address: str = '') -> dict:
     """Run health activity on selected profiles with specific activities."""
     global _health_status
     if _health_status.get('running'):
@@ -4045,7 +4046,7 @@ def run_health_activity(num_workers: int = 3, activities: list = None,
 
     t = threading.Thread(
         target=_run_all_health_worker,
-        args=(available, num_workers, activities, country, rounds, gmb_name, gmb_address),
+        args=(available, num_workers, activities, country, rounds, duration_minutes, gmb_name, gmb_address),
         daemon=True, name='run-health',
     )
     t.start()
@@ -4068,6 +4069,7 @@ def stop_health() -> dict:
 
 def _run_all_health_worker(profiles: list, num_workers: int, activities: list,
                            country: str = 'US', rounds: int = 1,
+                           duration_minutes: int = 0,
                            gmb_name: str = '', gmb_address: str = ''):
     """Background worker: run health activity on all profiles in parallel."""
     global _health_status
@@ -4095,7 +4097,8 @@ def _run_all_health_worker(profiles: list, num_workers: int, activities: list,
             try:
                 result = loop.run_until_complete(
                     _run_health_for_profile(profile, worker_id, activities, country=country,
-                                            rounds=rounds, gmb_name=gmb_name, gmb_address=gmb_address)
+                                            rounds=rounds, duration_minutes=duration_minutes,
+                                            gmb_name=gmb_name, gmb_address=gmb_address)
                 )
             finally:
                 try:
@@ -4211,8 +4214,8 @@ def _generate_health_report(results: list[dict], num_activities: int = 0) -> str
 
 async def _run_health_for_profile(profile: dict, worker_id: int,
                                    activities: list, country: str = 'US',
-                                   rounds: int = 1, gmb_name: str = '',
-                                   gmb_address: str = '') -> dict:
+                                   rounds: int = 1, duration_minutes: int = 0,
+                                   gmb_name: str = '', gmb_address: str = '') -> dict:
     # Use profile's saved address as fallback for GMB activity
     if not gmb_address and profile.get('address'):
         gmb_address = profile['address']
@@ -4248,6 +4251,7 @@ async def _run_health_for_profile(profile: dict, worker_id: int,
                 _log(f"[HEALTH][W{worker_id}] {email}: running {len(activities)} activities...")
                 result = await gmail_health_activity(page, worker_id, activities=activities,
                                                      country=country, rounds=rounds,
+                                                     duration_minutes=duration_minutes,
                                                      gmb_name=gmb_name, gmb_address=gmb_address)
 
                 # Disconnect — do NOT stop NST browser immediately (let it settle)

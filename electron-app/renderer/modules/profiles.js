@@ -1438,29 +1438,126 @@
         if (profCountFooter) profCountFooter.textContent = _healthChecked.size;
     }
 
+    // Smart Activity Presets — activities picked automatically based on goal
+    const _SMART_PRESETS = {
+        'gmail_trust': {
+            activities: [
+                'gmail_inbox', 'gmail_read_email', 'gmail_scroll_inbox', 'gmail_search_email', 'gmail_check_sent',
+                'search_news', 'search_weather', 'search_local', 'search_restaurants', 'search_tech',
+                'youtube_browse_feed', 'youtube_trending', 'youtube_watch_video',
+                'maps_search_restaurants', 'maps_browse_places',
+                'drive_browse', 'drive_recent',
+                'account_security', 'account_activity',
+                'news_headlines', 'calendar_view',
+            ],
+            duration: 10, rounds: 2,
+        },
+        'review_ready': {
+            activities: [
+                'maps_search_restaurants', 'maps_browse_places', 'maps_read_reviews', 'maps_view_photos', 'maps_street_view',
+                'maps_coffee_shops', 'maps_hotels', 'maps_supermarkets', 'maps_parks',
+                'search_restaurants', 'search_local', 'search_food', 'search_realestate',
+                'gmail_inbox', 'gmail_read_email',
+                'youtube_browse_feed', 'youtube_travel',
+                'custom_gmb',
+            ],
+            duration: 8, rounds: 2,
+        },
+        'review_sticky': {
+            activities: [
+                'maps_search_restaurants', 'maps_browse_places', 'maps_read_reviews', 'maps_view_photos', 'maps_directions',
+                'maps_street_view', 'maps_coffee_shops', 'maps_hotels', 'maps_parks', 'maps_supermarkets',
+                'maps_gas_stations', 'maps_pharmacies', 'maps_banks', 'maps_museums',
+                'search_local', 'search_restaurants', 'search_food',
+                'gmail_inbox',
+                'custom_gmb',
+            ],
+            duration: 15, rounds: 3,
+        },
+        'full_warmup': {
+            activities: [
+                'gmail_inbox', 'gmail_read_email', 'gmail_check_spam', 'gmail_check_sent', 'gmail_scroll_inbox',
+                'search_news', 'search_weather', 'search_tech', 'search_movies', 'search_sports',
+                'search_restaurants', 'search_local', 'search_music', 'search_books',
+                'youtube_browse_feed', 'youtube_trending', 'youtube_watch_video', 'youtube_music_playlist', 'youtube_shorts',
+                'maps_search_restaurants', 'maps_browse_places', 'maps_read_reviews',
+                'drive_browse', 'drive_recent', 'drive_shared',
+                'account_security', 'account_activity', 'account_profile',
+                'news_headlines', 'news_tech',
+                'shopping_electronics', 'shopping_clothing',
+                'photos_browse', 'translate_phrases', 'calendar_view', 'keep_browse',
+            ],
+            duration: 20, rounds: 2,
+        },
+        'local_presence': {
+            activities: [
+                'maps_search_restaurants', 'maps_browse_places', 'maps_read_reviews', 'maps_view_photos',
+                'maps_directions', 'maps_street_view', 'maps_coffee_shops', 'maps_hotels',
+                'maps_gas_stations', 'maps_parks', 'maps_shopping_malls', 'maps_pharmacies',
+                'maps_banks', 'maps_supermarkets', 'maps_museums', 'maps_gyms',
+                'search_local', 'search_restaurants', 'search_food', 'search_realestate',
+                'custom_gmb',
+            ],
+            duration: 12, rounds: 2,
+        },
+        'social_engage': {
+            activities: [
+                'youtube_browse_feed', 'youtube_trending', 'youtube_watch_video', 'youtube_shorts',
+                'youtube_gaming', 'youtube_cooking', 'youtube_news', 'youtube_comedy', 'youtube_music_playlist',
+                'news_headlines', 'news_tech', 'news_sports', 'news_entertainment',
+                'shopping_electronics', 'shopping_clothing', 'shopping_deals',
+                'gmail_inbox', 'gmail_read_email',
+                'search_news', 'search_movies', 'search_sports',
+            ],
+            duration: 10, rounds: 2,
+        },
+    };
+
     async function startHealth() {
-        const activities = Array.from(document.querySelectorAll('#healthModal .health-act-item input[type="checkbox"]:checked')).map(cb => cb.value);
+        const isSmartMode = !!(document.getElementById('healthSmartPanel')?.style.display !== 'none');
         const profileIds = _healthChecked.size > 0 ? Array.from(_healthChecked) : [];
         const workers = parseInt(document.getElementById('healthWorkers')?.value || '3', 10);
-        const rounds = parseInt(document.getElementById('healthRounds')?.value || '1', 10);
         const country = document.getElementById('healthCountry')?.value || 'US';
-        const gmbName = (document.getElementById('healthGmbName')?.value || '').trim();
-        const gmbAddress = (document.getElementById('healthGmbAddress')?.value || '').trim();
+        let activities, rounds, duration, gmbName, gmbAddress, smartGoal = '';
 
-        // Auto-add custom_gmb activity if GMB fields are filled
+        if (isSmartMode) {
+            // Smart mode — use preset
+            smartGoal = document.querySelector('input[name="healthSmartGoal"]:checked')?.value || 'gmail_trust';
+            const preset = _SMART_PRESETS[smartGoal] || _SMART_PRESETS['gmail_trust'];
+            activities = [...preset.activities];
+            rounds = parseInt(document.getElementById('healthRounds')?.value || String(preset.rounds), 10);
+            duration = parseInt(document.getElementById('healthDuration')?.value || String(preset.duration), 10);
+            gmbName = (document.getElementById('healthSmartGmbName')?.value || '').trim();
+            gmbAddress = (document.getElementById('healthSmartGmbAddress')?.value || '').trim();
+        } else {
+            // Manual mode
+            activities = Array.from(document.querySelectorAll('#healthManualPanel .health-act-item input[type="checkbox"]:checked')).map(cb => cb.value);
+            rounds = parseInt(document.getElementById('healthRounds')?.value || '1', 10);
+            duration = parseInt(document.getElementById('healthDuration')?.value || '0', 10);
+            gmbName = (document.getElementById('healthGmbName')?.value || '').trim();
+            gmbAddress = (document.getElementById('healthGmbAddress')?.value || '').trim();
+        }
+
+        // Auto-add custom_gmb if GMB fields filled
         if (gmbName && gmbAddress && !activities.includes('custom_gmb')) {
             activities.unshift('custom_gmb');
         }
-        if (activities.length === 0) { App.toast('Select at least one activity or fill GMB fields', 'error'); return; }
+        if (activities.length === 0) { App.toast('Select at least one activity', 'error'); return; }
 
         closeHealthModal();
         try {
             const data = await _api('/api/profiles/run-health', {
                 method: 'POST',
-                body: JSON.stringify({ num_workers: workers, activities, profile_ids: profileIds, country, rounds, gmb_name: gmbName, gmb_address: gmbAddress })
+                body: JSON.stringify({
+                    num_workers: workers, activities, profile_ids: profileIds, country,
+                    rounds, duration_minutes: duration,
+                    gmb_name: gmbName, gmb_address: gmbAddress,
+                    smart_goal: smartGoal,
+                })
             });
             if (data.success) {
-                App.toast(`Health started on ${data.total} profile(s)`, 'success');
+                const modeLabel = isSmartMode ? `Smart: ${smartGoal.replace(/_/g,' ')}` : 'Manual';
+                App.toast(`Health started (${modeLabel}) on ${data.total} profile(s)`, 'success');
                 _startOpProgress('health');
                 _startStatusPolling();
             }
@@ -2064,6 +2161,42 @@
         _btn('healthModalClose', closeHealthModal);
         _btn('healthModalCancelBtn', closeHealthModal);
         _btn('healthModalStartBtn', startHealth);
+
+        // Smart vs Manual mode toggle
+        document.querySelectorAll('.health-mode-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.health-mode-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                const mode = btn.dataset.mode;
+                const smartPanel = document.getElementById('healthSmartPanel');
+                const manualPanel = document.getElementById('healthManualPanel');
+                if (smartPanel) smartPanel.style.display = mode === 'smart' ? 'block' : 'none';
+                if (manualPanel) manualPanel.style.display = mode === 'manual' ? 'block' : 'none';
+                // When switching to smart, auto-set recommended duration
+                if (mode === 'smart') {
+                    const goal = document.querySelector('input[name="healthSmartGoal"]:checked')?.value || 'gmail_trust';
+                    const preset = _SMART_PRESETS[goal];
+                    if (preset) {
+                        const durEl = document.getElementById('healthDuration');
+                        const rndEl = document.getElementById('healthRounds');
+                        if (durEl && !parseInt(durEl.value)) durEl.value = preset.duration;
+                        if (rndEl) rndEl.value = preset.rounds;
+                    }
+                }
+            });
+        });
+        // Smart goal change → update recommended duration
+        document.querySelectorAll('input[name="healthSmartGoal"]').forEach(radio => {
+            radio.addEventListener('change', () => {
+                const preset = _SMART_PRESETS[radio.value];
+                if (preset) {
+                    const durEl = document.getElementById('healthDuration');
+                    const rndEl = document.getElementById('healthRounds');
+                    if (durEl) durEl.value = preset.duration;
+                    if (rndEl) rndEl.value = preset.rounds;
+                }
+            });
+        });
         _btn('healthSelectAll', () => {
             document.querySelectorAll('#healthModal .health-act-item input[type="checkbox"]').forEach(cb => cb.checked = true);
             _updateHealthCount();

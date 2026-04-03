@@ -2419,6 +2419,7 @@ def profiles_run_health():
     profile_ids = data.get('profile_ids', [])
     country = data.get('country', 'US')
     rounds = int(data.get('rounds', 1))
+    duration_minutes = int(data.get('duration_minutes', 0))
     gmb_name = data.get('gmb_name', '')
     gmb_address = data.get('gmb_address', '')
     result = profile_manager.run_health_activity(
@@ -2427,6 +2428,7 @@ def profiles_run_health():
         profile_ids=profile_ids,
         country=country,
         rounds=rounds,
+        duration_minutes=duration_minutes,
         gmb_name=gmb_name,
         gmb_address=gmb_address,
     )
