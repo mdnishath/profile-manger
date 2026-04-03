@@ -664,6 +664,7 @@
             _setVal('pmPassword', p.password || '');
             _setVal('pmTotp', p.totp_secret || '');
             _setVal('pmNotes', p.notes || '');
+            _setVal('pmAddress', p.address || '');
             const codes = p.backup_codes || [];
             for (let i = 1; i <= 10; i++) _setVal('pmBC' + i, codes[i - 1] || '');
 
@@ -687,7 +688,7 @@
         _setVal('pmProxyHost', ''); _setVal('pmProxyPort', ''); _setVal('pmProxyUser', ''); _setVal('pmProxyPass', '');
         _setVal('pmProxyPaste', '');
         _toggleProxyFields();
-        _setVal('pmEmail', ''); _setVal('pmPassword', ''); _setVal('pmTotp', ''); _setVal('pmNotes', '');
+        _setVal('pmEmail', ''); _setVal('pmPassword', ''); _setVal('pmTotp', ''); _setVal('pmNotes', ''); _setVal('pmAddress', '');
         for (let i = 1; i <= 10; i++) _setVal('pmBC' + i, '');
         _switchTab('overview');
     }
@@ -781,6 +782,7 @@
             proxy,
             engine,
             notes: _val('pmNotes').trim(),
+            address: _val('pmAddress').trim(),
             password: _val('pmPassword').trim(),
             totp_secret: _val('pmTotp').trim(),
             backup_codes,
@@ -1438,15 +1440,24 @@
 
     async function startHealth() {
         const activities = Array.from(document.querySelectorAll('#healthModal .health-act-item input[type="checkbox"]:checked')).map(cb => cb.value);
-        if (activities.length === 0) { App.toast('Select at least one activity', 'error'); return; }
         const profileIds = _healthChecked.size > 0 ? Array.from(_healthChecked) : [];
         const workers = parseInt(document.getElementById('healthWorkers')?.value || '3', 10);
+        const rounds = parseInt(document.getElementById('healthRounds')?.value || '1', 10);
         const country = document.getElementById('healthCountry')?.value || 'US';
+        const gmbName = (document.getElementById('healthGmbName')?.value || '').trim();
+        const gmbAddress = (document.getElementById('healthGmbAddress')?.value || '').trim();
+
+        // Auto-add custom_gmb activity if GMB fields are filled
+        if (gmbName && gmbAddress && !activities.includes('custom_gmb')) {
+            activities.unshift('custom_gmb');
+        }
+        if (activities.length === 0) { App.toast('Select at least one activity or fill GMB fields', 'error'); return; }
+
         closeHealthModal();
         try {
             const data = await _api('/api/profiles/run-health', {
                 method: 'POST',
-                body: JSON.stringify({ num_workers: workers, activities, profile_ids: profileIds, country })
+                body: JSON.stringify({ num_workers: workers, activities, profile_ids: profileIds, country, rounds, gmb_name: gmbName, gmb_address: gmbAddress })
             });
             if (data.success) {
                 App.toast(`Health started on ${data.total} profile(s)`, 'success');

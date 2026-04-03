@@ -688,6 +688,7 @@
                                 <div class="form-group"><label>Password</label><input type="password" id="pmPassword" placeholder="Gmail password"></div>
                                 <div class="form-group"><label>TOTP Secret</label><input type="text" id="pmTotp" placeholder="TOTP key"></div>
                             </div>
+                            <div class="form-group"><label>Business Address</label><input type="text" id="pmAddress" placeholder="e.g. 123 Main St, Paris, France — GMB area for this profile"></div>
                             <div class="form-group"><label>Notes</label><textarea id="pmNotes" rows="2" placeholder="Any notes..."></textarea></div>
                             <div style="font-size:12px;font-weight:600;color:#94a3b8;margin:12px 0 6px;">Backup Codes</div>
                             <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
@@ -1159,6 +1160,10 @@
                         <label style="font-size:12px;color:#94a3b8;white-space:nowrap;">Workers:</label>
                         <input type="number" id="healthWorkers" value="3" min="1" max="10" style="width:56px;background:#1a1a1a;color:#e2e8f0;border:1px solid rgba(255,255,255,0.12);border-radius:6px;padding:4px 8px;font-size:12px;text-align:center;">
                     </div>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <label style="font-size:12px;color:#94a3b8;white-space:nowrap;">Rounds:</label>
+                        <input type="number" id="healthRounds" value="1" min="1" max="10" title="How many times to repeat all selected activities per profile" style="width:56px;background:#1a1a1a;color:#e2e8f0;border:1px solid rgba(255,255,255,0.12);border-radius:6px;padding:4px 8px;font-size:12px;text-align:center;">
+                    </div>
                 </div>
             </div>
             <!-- Split: Profiles (left) + Activities (right) -->
@@ -1187,6 +1192,15 @@
 
                 <!-- RIGHT: Activities -->
                 <div style="flex:1;overflow-y:auto;padding:14px 16px;">
+                    <!-- Custom GMB Activity -->
+                    <div style="background:rgba(139,92,246,0.06);border:1px solid rgba(139,92,246,0.2);border-radius:8px;padding:10px 12px;margin-bottom:14px;">
+                        <div style="font-size:11px;font-weight:700;color:#a78bfa;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px;"><i class="fas fa-map-marker-alt" style="margin-right:4px;"></i> Custom GMB Activity</div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+                            <input type="text" id="healthGmbName" placeholder="Business name (e.g. Pizza Palace)" style="background:#1a1a1a;color:#e2e8f0;border:1px solid rgba(139,92,246,0.3);border-radius:6px;padding:5px 10px;font-size:12px;">
+                            <input type="text" id="healthGmbAddress" placeholder="Address (e.g. 15 Rue de Rivoli, Paris)" style="background:#1a1a1a;color:#e2e8f0;border:1px solid rgba(139,92,246,0.3);border-radius:6px;padding:5px 10px;font-size:12px;">
+                        </div>
+                        <div style="font-size:10px;color:#64748b;margin-top:4px;">Fill both to auto-add GMB search, maps exploration, and nearby activity around this business.</div>
+                    </div>
                     <div style="display:flex;gap:6px;margin-bottom:12px;align-items:center;flex-wrap:wrap;">
                         <span style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.8px;flex:1;">Activities — <span id="healthSelectedCount" style="color:#e2e8f0;">9</span> selected</span>
                         <button class="btn btn-sm btn-secondary" id="healthSelectAll" style="font-size:10px;padding:2px 8px;">All</button>
@@ -1201,170 +1215,212 @@
                         </button>
                     </div>
 
-                    <!-- Google Search -->
+                    <!-- Google Search (40 activities) -->
                     <div class="health-cat">
                         <div class="health-cat-title"><i class="fab fa-google" style="color:#4285f4;"></i> Google Search</div>
-                        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:5px;">
-                            <label class="health-act-item"><input type="checkbox" value="search_restaurants" checked> Nearby restaurants</label>
-                            <label class="health-act-item"><input type="checkbox" value="search_news" checked> Latest news</label>
-                            <label class="health-act-item"><input type="checkbox" value="search_weather" checked> Weather forecast</label>
-                            <label class="health-act-item"><input type="checkbox" value="search_movies"> Movies &amp; shows</label>
-                            <label class="health-act-item"><input type="checkbox" value="search_sports"> Sports scores</label>
-                            <label class="health-act-item"><input type="checkbox" value="search_tech"> Technology news</label>
-                            <label class="health-act-item"><input type="checkbox" value="search_travel"> Travel destinations</label>
+                        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;">
+                            <label class="health-act-item"><input type="checkbox" value="search_restaurants" checked> Restaurants</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_news" checked> News</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_weather" checked> Weather</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_movies"> Movies</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_sports"> Sports</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_tech"> Technology</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_travel"> Travel</label>
                             <label class="health-act-item"><input type="checkbox" value="search_recipes"> Recipes</label>
-                            <label class="health-act-item"><input type="checkbox" value="search_products"> Product reviews</label>
-                            <label class="health-act-item"><input type="checkbox" value="search_local"> Local businesses</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_products"> Products</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_local"> Local biz</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_music"> Music</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_gardening"> Gardening</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_photography"> Photography</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_astronomy"> Astronomy</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_history"> History</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_science"> Science</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_books"> Books</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_art"> Art</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_cooking"> Cooking</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_parenting"> Parenting</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_psychology"> Psychology</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_philosophy"> Philosophy</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_architecture"> Architecture</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_interior_design"> Interior design</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_marketing"> Marketing</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_startups"> Startups</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_programming"> Programming</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_ai"> AI / ML</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_space"> Space</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_environment"> Environment</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_crypto"> Crypto</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_finance"> Finance</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_fashion"> Fashion</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_beauty"> Beauty</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_jobs"> Jobs</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_education"> Education</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_fitness"> Fitness</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_health"> Health</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_food"> Food</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_realestate"> Real estate</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_pets"> Pets</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_diy"> DIY</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_cars"> Cars</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_podcasts"> Podcasts</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_anime"> Anime</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_gaming"> Gaming</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_camping"> Camping</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_cycling"> Cycling</label>
                         </div>
                     </div>
-                    <!-- Gmail -->
+                    <!-- Gmail (10 activities) -->
                     <div class="health-cat">
                         <div class="health-cat-title"><i class="fas fa-envelope" style="color:#ea4335;"></i> Gmail</div>
-                        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:5px;">
+                        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;">
                             <label class="health-act-item"><input type="checkbox" value="gmail_inbox" checked> Check inbox</label>
-                            <label class="health-act-item"><input type="checkbox" value="gmail_read_email" checked> Read recent emails</label>
+                            <label class="health-act-item"><input type="checkbox" value="gmail_read_email" checked> Read emails</label>
                             <label class="health-act-item"><input type="checkbox" value="gmail_check_spam"> Check spam</label>
                             <label class="health-act-item"><input type="checkbox" value="gmail_check_sent"> Check sent</label>
                             <label class="health-act-item"><input type="checkbox" value="gmail_scroll_inbox"> Scroll inbox</label>
                             <label class="health-act-item"><input type="checkbox" value="gmail_search_email"> Search email</label>
+                            <label class="health-act-item"><input type="checkbox" value="gmail_compose_draft"> Compose draft</label>
+                            <label class="health-act-item"><input type="checkbox" value="gmail_star_email"> Star emails</label>
+                            <label class="health-act-item"><input type="checkbox" value="gmail_labels"> Browse labels</label>
+                            <label class="health-act-item"><input type="checkbox" value="gmail_contacts"> Contacts</label>
                         </div>
                     </div>
-                    <!-- YouTube -->
+                    <!-- YouTube (20 activities) -->
                     <div class="health-cat">
                         <div class="health-cat-title"><i class="fab fa-youtube" style="color:#ff0000;"></i> YouTube</div>
-                        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:5px;">
+                        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;">
                             <label class="health-act-item"><input type="checkbox" value="youtube_browse_feed" checked> Browse feed</label>
-                            <label class="health-act-item"><input type="checkbox" value="youtube_trending"> Trending videos</label>
-                            <label class="health-act-item"><input type="checkbox" value="youtube_search_music"> Search music</label>
-                            <label class="health-act-item"><input type="checkbox" value="youtube_shorts"> YouTube Shorts</label>
+                            <label class="health-act-item"><input type="checkbox" value="youtube_trending"> Trending</label>
+                            <label class="health-act-item"><input type="checkbox" value="youtube_search_music"> Music</label>
+                            <label class="health-act-item"><input type="checkbox" value="youtube_shorts"> Shorts</label>
                             <label class="health-act-item"><input type="checkbox" value="youtube_subscriptions"> Subscriptions</label>
                             <label class="health-act-item"><input type="checkbox" value="youtube_watch_video"> Watch video</label>
+                            <label class="health-act-item"><input type="checkbox" value="youtube_gaming"> Gaming</label>
+                            <label class="health-act-item"><input type="checkbox" value="youtube_cooking"> Cooking</label>
+                            <label class="health-act-item"><input type="checkbox" value="youtube_news"> News</label>
+                            <label class="health-act-item"><input type="checkbox" value="youtube_education"> Education</label>
+                            <label class="health-act-item"><input type="checkbox" value="youtube_tech_review"> Tech review</label>
+                            <label class="health-act-item"><input type="checkbox" value="youtube_vlogs"> Vlogs</label>
+                            <label class="health-act-item"><input type="checkbox" value="youtube_sports"> Sports</label>
+                            <label class="health-act-item"><input type="checkbox" value="youtube_music_playlist"> Playlists</label>
+                            <label class="health-act-item"><input type="checkbox" value="youtube_diy"> DIY</label>
+                            <label class="health-act-item"><input type="checkbox" value="youtube_travel"> Travel</label>
+                            <label class="health-act-item"><input type="checkbox" value="youtube_fitness"> Fitness</label>
+                            <label class="health-act-item"><input type="checkbox" value="youtube_comedy"> Comedy</label>
+                            <label class="health-act-item"><input type="checkbox" value="youtube_documentary"> Documentary</label>
+                            <label class="health-act-item"><input type="checkbox" value="youtube_asmr"> ASMR</label>
                         </div>
                     </div>
-                    <!-- Google Maps -->
+                    <!-- Google Maps (22 activities) -->
                     <div class="health-cat">
                         <div class="health-cat-title"><i class="fas fa-map-marked-alt" style="color:#34a853;"></i> Google Maps</div>
-                        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:5px;">
-                            <label class="health-act-item"><input type="checkbox" value="maps_search_restaurants" checked> Nearby restaurants</label>
+                        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;">
+                            <label class="health-act-item"><input type="checkbox" value="maps_search_restaurants" checked> Restaurants</label>
                             <label class="health-act-item"><input type="checkbox" value="maps_directions"> Directions</label>
                             <label class="health-act-item"><input type="checkbox" value="maps_browse_places"> Browse places</label>
-                            <label class="health-act-item"><input type="checkbox" value="maps_view_photos"> Place photos</label>
-                            <label class="health-act-item"><input type="checkbox" value="maps_read_reviews"> Place reviews</label>
+                            <label class="health-act-item"><input type="checkbox" value="maps_view_photos"> Photos</label>
+                            <label class="health-act-item"><input type="checkbox" value="maps_read_reviews"> Reviews</label>
                             <label class="health-act-item"><input type="checkbox" value="maps_street_view"> Street view</label>
+                            <label class="health-act-item"><input type="checkbox" value="maps_gas_stations"> Gas stations</label>
+                            <label class="health-act-item"><input type="checkbox" value="maps_hotels"> Hotels</label>
+                            <label class="health-act-item"><input type="checkbox" value="maps_hospitals"> Hospitals</label>
+                            <label class="health-act-item"><input type="checkbox" value="maps_parks"> Parks</label>
+                            <label class="health-act-item"><input type="checkbox" value="maps_shopping_malls"> Malls</label>
+                            <label class="health-act-item"><input type="checkbox" value="maps_coffee_shops"> Coffee shops</label>
+                            <label class="health-act-item"><input type="checkbox" value="maps_gyms"> Gyms</label>
+                            <label class="health-act-item"><input type="checkbox" value="maps_atms"> ATMs</label>
+                            <label class="health-act-item"><input type="checkbox" value="maps_pharmacies"> Pharmacies</label>
+                            <label class="health-act-item"><input type="checkbox" value="maps_schools"> Schools</label>
+                            <label class="health-act-item"><input type="checkbox" value="maps_banks"> Banks</label>
+                            <label class="health-act-item"><input type="checkbox" value="maps_supermarkets"> Supermarkets</label>
+                            <label class="health-act-item"><input type="checkbox" value="maps_libraries"> Libraries</label>
+                            <label class="health-act-item"><input type="checkbox" value="maps_museums"> Museums</label>
+                            <label class="health-act-item"><input type="checkbox" value="maps_theaters"> Theaters</label>
+                            <label class="health-act-item"><input type="checkbox" value="maps_car_wash"> Car wash</label>
                         </div>
                     </div>
-                    <!-- Google Drive -->
-                    <div class="health-cat">
-                        <div class="health-cat-title"><i class="fab fa-google-drive" style="color:#fbbc04;"></i> Google Drive</div>
-                        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:5px;">
-                            <label class="health-act-item"><input type="checkbox" value="drive_browse"> Browse My Drive</label>
-                            <label class="health-act-item"><input type="checkbox" value="drive_recent"> Recent files</label>
-                            <label class="health-act-item"><input type="checkbox" value="drive_shared"> Shared files</label>
-                            <label class="health-act-item"><input type="checkbox" value="drive_new_doc"> Create document</label>
-                        </div>
-                    </div>
-                    <!-- Google Account -->
-                    <div class="health-cat">
-                        <div class="health-cat-title"><i class="fas fa-user-shield" style="color:#a142f4;"></i> Google Account</div>
-                        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:5px;">
-                            <label class="health-act-item"><input type="checkbox" value="account_security"> Security settings</label>
-                            <label class="health-act-item"><input type="checkbox" value="account_activity"> Account activity</label>
-                            <label class="health-act-item"><input type="checkbox" value="account_profile"> Profile settings</label>
-                            <label class="health-act-item"><input type="checkbox" value="account_privacy"> Privacy settings</label>
-                        </div>
-                    </div>
-                    <!-- Google News -->
+                    <!-- Google News (11 activities) -->
                     <div class="health-cat">
                         <div class="health-cat-title"><i class="fas fa-newspaper" style="color:#00bcd4;"></i> Google News</div>
-                        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:5px;">
-                            <label class="health-act-item"><input type="checkbox" value="news_headlines" checked> Top headlines</label>
-                            <label class="health-act-item"><input type="checkbox" value="news_tech"> Tech news</label>
-                            <label class="health-act-item"><input type="checkbox" value="news_sports"> Sports news</label>
+                        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;">
+                            <label class="health-act-item"><input type="checkbox" value="news_headlines" checked> Headlines</label>
+                            <label class="health-act-item"><input type="checkbox" value="news_tech"> Tech</label>
+                            <label class="health-act-item"><input type="checkbox" value="news_sports"> Sports</label>
                             <label class="health-act-item"><input type="checkbox" value="news_entertainment"> Entertainment</label>
-                            <label class="health-act-item"><input type="checkbox" value="news_business"> Business news</label>
+                            <label class="health-act-item"><input type="checkbox" value="news_business"> Business</label>
+                            <label class="health-act-item"><input type="checkbox" value="news_health"> Health</label>
+                            <label class="health-act-item"><input type="checkbox" value="news_science"> Science</label>
+                            <label class="health-act-item"><input type="checkbox" value="news_world"> World</label>
+                            <label class="health-act-item"><input type="checkbox" value="news_politics"> Politics</label>
+                            <label class="health-act-item"><input type="checkbox" value="news_environment"> Environment</label>
+                            <label class="health-act-item"><input type="checkbox" value="news_education"> Education</label>
                         </div>
                     </div>
-                    <!-- Google Shopping -->
+                    <!-- Google Shopping (12 activities) -->
                     <div class="health-cat">
-                        <div class="health-cat-title"><i class="fas fa-shopping-cart" style="color:#f9ab00;"></i> Google Shopping</div>
-                        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:5px;">
+                        <div class="health-cat-title"><i class="fas fa-shopping-cart" style="color:#f9ab00;"></i> Shopping</div>
+                        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;">
                             <label class="health-act-item"><input type="checkbox" value="shopping_electronics"> Electronics</label>
                             <label class="health-act-item"><input type="checkbox" value="shopping_clothing"> Clothing</label>
-                            <label class="health-act-item"><input type="checkbox" value="shopping_compare"> Compare products</label>
+                            <label class="health-act-item"><input type="checkbox" value="shopping_compare"> Compare</label>
                             <label class="health-act-item"><input type="checkbox" value="shopping_deals"> Deals</label>
+                            <label class="health-act-item"><input type="checkbox" value="shopping_home"> Home</label>
+                            <label class="health-act-item"><input type="checkbox" value="shopping_beauty"> Beauty</label>
+                            <label class="health-act-item"><input type="checkbox" value="shopping_sports"> Sports</label>
+                            <label class="health-act-item"><input type="checkbox" value="shopping_toys"> Toys</label>
+                            <label class="health-act-item"><input type="checkbox" value="shopping_books"> Books</label>
+                            <label class="health-act-item"><input type="checkbox" value="shopping_garden"> Garden</label>
+                            <label class="health-act-item"><input type="checkbox" value="shopping_automotive"> Automotive</label>
+                            <label class="health-act-item"><input type="checkbox" value="shopping_jewelry"> Jewelry</label>
                         </div>
                     </div>
-                    <!-- Google Photos -->
+                    <!-- Drive + Account + Photos + Other (combined) -->
                     <div class="health-cat">
-                        <div class="health-cat-title"><i class="fas fa-images" style="color:#ea4335;"></i> Google Photos</div>
-                        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:5px;">
-                            <label class="health-act-item"><input type="checkbox" value="photos_browse"> Browse photos</label>
-                            <label class="health-act-item"><input type="checkbox" value="photos_albums"> View albums</label>
-                        </div>
-                    </div>
-                    <!-- Other Services -->
-                    <div class="health-cat">
-                        <div class="health-cat-title"><i class="fas fa-th" style="color:#94a3b8;"></i> Other Google Services</div>
-                        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:5px;">
-                            <label class="health-act-item"><input type="checkbox" value="translate_phrases"> Translate phrases</label>
-                            <label class="health-act-item"><input type="checkbox" value="calendar_view"> Google Calendar</label>
-                            <label class="health-act-item"><input type="checkbox" value="keep_browse"> Google Keep</label>
+                        <div class="health-cat-title"><i class="fas fa-th" style="color:#94a3b8;"></i> Drive, Account, Photos &amp; Other</div>
+                        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;">
+                            <label class="health-act-item"><input type="checkbox" value="drive_browse"> Drive: Browse</label>
+                            <label class="health-act-item"><input type="checkbox" value="drive_recent"> Drive: Recent</label>
+                            <label class="health-act-item"><input type="checkbox" value="drive_shared"> Drive: Shared</label>
+                            <label class="health-act-item"><input type="checkbox" value="drive_new_doc"> Drive: New doc</label>
+                            <label class="health-act-item"><input type="checkbox" value="drive_search"> Drive: Search</label>
+                            <label class="health-act-item"><input type="checkbox" value="drive_trash"> Drive: Trash</label>
+                            <label class="health-act-item"><input type="checkbox" value="drive_starred"> Drive: Starred</label>
+                            <label class="health-act-item"><input type="checkbox" value="account_security"> Security</label>
+                            <label class="health-act-item"><input type="checkbox" value="account_activity"> Activity</label>
+                            <label class="health-act-item"><input type="checkbox" value="account_profile"> Profile</label>
+                            <label class="health-act-item"><input type="checkbox" value="account_privacy"> Privacy</label>
+                            <label class="health-act-item"><input type="checkbox" value="account_storage"> Storage</label>
+                            <label class="health-act-item"><input type="checkbox" value="account_payments"> Payments</label>
+                            <label class="health-act-item"><input type="checkbox" value="account_data_export"> Data export</label>
+                            <label class="health-act-item"><input type="checkbox" value="photos_browse"> Photos</label>
+                            <label class="health-act-item"><input type="checkbox" value="photos_albums"> Albums</label>
+                            <label class="health-act-item"><input type="checkbox" value="photos_favorites"> Favorites</label>
+                            <label class="health-act-item"><input type="checkbox" value="photos_archive"> Archive</label>
+                            <label class="health-act-item"><input type="checkbox" value="translate_phrases"> Translate</label>
+                            <label class="health-act-item"><input type="checkbox" value="calendar_view"> Calendar</label>
+                            <label class="health-act-item"><input type="checkbox" value="keep_browse"> Keep</label>
                             <label class="health-act-item"><input type="checkbox" value="play_browse_apps"> Play Store</label>
-                            <label class="health-act-item"><input type="checkbox" value="meet_check"> Google Meet</label>
+                            <label class="health-act-item"><input type="checkbox" value="meet_check"> Meet</label>
+                            <label class="health-act-item"><input type="checkbox" value="contacts_browse"> Contacts</label>
+                            <label class="health-act-item"><input type="checkbox" value="blogger_browse"> Blogger</label>
+                            <label class="health-act-item"><input type="checkbox" value="forms_browse"> Forms</label>
                         </div>
                     </div>
-                    <!-- Crypto & Finance -->
+                    <!-- Trending (remaining search topics) -->
                     <div class="health-cat">
-                        <div class="health-cat-title"><i class="fas fa-chart-line" style="color:#22c55e;"></i> Crypto &amp; Finance</div>
-                        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:5px;">
-                            <label class="health-act-item"><input type="checkbox" value="search_crypto"> Crypto prices &amp; news</label>
-                            <label class="health-act-item"><input type="checkbox" value="search_finance"> Finance &amp; investing</label>
-                            <label class="health-act-item"><input type="checkbox" value="search_shopping"> Shopping deals</label>
-                        </div>
-                    </div>
-                    <!-- Fashion & Beauty -->
-                    <div class="health-cat">
-                        <div class="health-cat-title"><i class="fas fa-tshirt" style="color:#ec4899;"></i> Fashion &amp; Beauty</div>
-                        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:5px;">
-                            <label class="health-act-item"><input type="checkbox" value="search_fashion"> Fashion trends</label>
-                            <label class="health-act-item"><input type="checkbox" value="search_beauty"> Beauty &amp; skincare</label>
-                        </div>
-                    </div>
-                    <!-- Jobs & Education -->
-                    <div class="health-cat">
-                        <div class="health-cat-title"><i class="fas fa-graduation-cap" style="color:#60a5fa;"></i> Jobs &amp; Education</div>
-                        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:5px;">
-                            <label class="health-act-item"><input type="checkbox" value="search_jobs"> Job search</label>
-                            <label class="health-act-item"><input type="checkbox" value="search_education"> Online courses</label>
-                        </div>
-                    </div>
-                    <!-- Health & Fitness -->
-                    <div class="health-cat">
-                        <div class="health-cat-title"><i class="fas fa-dumbbell" style="color:#f59e0b;"></i> Health &amp; Fitness</div>
-                        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:5px;">
-                            <label class="health-act-item"><input type="checkbox" value="search_fitness"> Workouts &amp; fitness</label>
-                            <label class="health-act-item"><input type="checkbox" value="search_health"> Health tips</label>
-                        </div>
-                    </div>
-                    <!-- Lifestyle -->
-                    <div class="health-cat">
-                        <div class="health-cat-title"><i class="fas fa-home" style="color:#94a3b8;"></i> Lifestyle</div>
-                        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:5px;">
-                            <label class="health-act-item"><input type="checkbox" value="search_food"> Food &amp; recipes</label>
-                            <label class="health-act-item"><input type="checkbox" value="search_realestate"> Real estate</label>
-                            <label class="health-act-item"><input type="checkbox" value="search_pets"> Pets &amp; animals</label>
-                            <label class="health-act-item"><input type="checkbox" value="search_diy"> DIY &amp; home</label>
-                            <label class="health-act-item"><input type="checkbox" value="search_cars"> Cars &amp; automotive</label>
-                        </div>
-                    </div>
-                    <!-- News & Tech -->
-                    <div class="health-cat">
-                        <div class="health-cat-title"><i class="fas fa-rss" style="color:#f97316;"></i> News &amp; Tech</div>
-                        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:5px;">
+                        <div class="health-cat-title"><i class="fas fa-rss" style="color:#f97316;"></i> More Topics</div>
+                        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;">
                             <label class="health-act-item"><input type="checkbox" value="search_news_world"> World news</label>
                             <label class="health-act-item"><input type="checkbox" value="search_tech_news"> Tech news</label>
                             <label class="health-act-item"><input type="checkbox" value="search_sports_news"> Sports news</label>
-                            <label class="health-act-item"><input type="checkbox" value="search_gaming"> Gaming news</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_shopping"> Shopping deals</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_manga"> Manga</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_board_games"> Board games</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_fishing"> Fishing</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_comedy"> Comedy</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_documentaries"> Documentaries</label>
+                            <label class="health-act-item"><input type="checkbox" value="search_politics"> Politics</label>
+                            <label class="health-act-item"><input type="checkbox" value="sites_browse"> Google Sites</label>
                         </div>
                     </div>
                 </div><!-- end right activities -->

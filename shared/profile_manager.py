@@ -3996,7 +3996,8 @@ _health_status: dict = {}
 
 
 def run_health_activity(num_workers: int = 3, activities: list = None,
-                        profile_ids: list = None, country: str = 'US') -> dict:
+                        profile_ids: list = None, country: str = 'US',
+                        rounds: int = 1, gmb_name: str = '', gmb_address: str = '') -> dict:
     """Run health activity on selected profiles with specific activities."""
     global _health_status
     if _health_status.get('running'):
@@ -4037,7 +4038,7 @@ def run_health_activity(num_workers: int = 3, activities: list = None,
 
     t = threading.Thread(
         target=_run_all_health_worker,
-        args=(available, num_workers, activities, country),
+        args=(available, num_workers, activities, country, rounds, gmb_name, gmb_address),
         daemon=True, name='run-health',
     )
     t.start()
@@ -4059,7 +4060,8 @@ def stop_health() -> dict:
 
 
 def _run_all_health_worker(profiles: list, num_workers: int, activities: list,
-                           country: str = 'US'):
+                           country: str = 'US', rounds: int = 1,
+                           gmb_name: str = '', gmb_address: str = ''):
     """Background worker: run health activity on all profiles in parallel."""
     global _health_status
     from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -4085,7 +4087,8 @@ def _run_all_health_worker(profiles: list, num_workers: int, activities: list,
             asyncio.set_event_loop(loop)
             try:
                 result = loop.run_until_complete(
-                    _run_health_for_profile(profile, worker_id, activities, country=country)
+                    _run_health_for_profile(profile, worker_id, activities, country=country,
+                                            rounds=rounds, gmb_name=gmb_name, gmb_address=gmb_address)
                 )
             finally:
                 try:
@@ -4200,7 +4203,9 @@ def _generate_health_report(results: list[dict], num_activities: int = 0) -> str
 
 
 async def _run_health_for_profile(profile: dict, worker_id: int,
-                                   activities: list, country: str = 'US') -> dict:
+                                   activities: list, country: str = 'US',
+                                   rounds: int = 1, gmb_name: str = '',
+                                   gmb_address: str = '') -> dict:
     """Launch browser via NST API (NST profiles) or StealthChrome (local),
     run health activities, close browser. NO signout — session stays alive."""
     from playwright.async_api import async_playwright
@@ -4232,7 +4237,8 @@ async def _run_health_for_profile(profile: dict, worker_id: int,
 
                 _log(f"[HEALTH][W{worker_id}] {email}: running {len(activities)} activities...")
                 result = await gmail_health_activity(page, worker_id, activities=activities,
-                                                     country=country)
+                                                     country=country, rounds=rounds,
+                                                     gmb_name=gmb_name, gmb_address=gmb_address)
 
                 # Disconnect — do NOT stop NST browser immediately (let it settle)
                 try:

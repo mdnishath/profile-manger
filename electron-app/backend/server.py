@@ -1859,6 +1859,7 @@ def profiles_export_excel():
         ('Groups',        18),
         ('Engine',        10),
         ('Proxy',         38),
+        ('Address',       35),
         ('Notes',         30),
         ('Created At',    18),
     ]
@@ -1924,6 +1925,7 @@ def profiles_export_excel():
             groups,
             (p.get('engine', 'nexus') or 'nexus').upper(),
             proxy_str,
+            p.get('address', ''),
             p.get('notes', ''),
             p.get('created_at', ''),
             # divider column
@@ -2416,13 +2418,17 @@ def profiles_run_health():
     activities = data.get('activities', [])
     profile_ids = data.get('profile_ids', [])
     country = data.get('country', 'US')
-    language = data.get('language', '')
+    rounds = int(data.get('rounds', 1))
+    gmb_name = data.get('gmb_name', '')
+    gmb_address = data.get('gmb_address', '')
     result = profile_manager.run_health_activity(
         num_workers=num_workers,
         activities=activities,
         profile_ids=profile_ids,
         country=country,
-        language=language,
+        rounds=rounds,
+        gmb_name=gmb_name,
+        gmb_address=gmb_address,
     )
     return jsonify(result)
 
