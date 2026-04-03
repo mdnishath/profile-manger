@@ -1533,6 +1533,42 @@
         'setai':       { icon: 'fa-robot',        label: 'SetAI Hook',     successLbl: 'Hooked',      failLbl: 'Failed',  pendingLbl: 'Remaining' },
     };
 
+    // Auto-detect running operations on page load / refresh
+    async function _autoDetectRunningOps() {
+        if (!App.state.serverOnline || _opType) return;
+        try {
+            // Check all operation status endpoints
+            const checks = [
+                { type: 'appeal', url: '/api/profiles/appeal-status' },
+                { type: 'health', url: '/api/profiles/health-status' },
+                { type: 'review', url: '/api/profiles/review-status' },
+            ];
+            for (const chk of checks) {
+                try {
+                    const res = await App.apiFetch(chk.url);
+                    const st = await res.json();
+                    if (st.running) {
+                        _startOpProgress(chk.type);
+                        return;
+                    }
+                } catch (e) { /* ignore */ }
+            }
+            // Check main progress endpoint for batch login / relogin
+            try {
+                const res = await App.apiFetch('/api/progress');
+                const data = await res.json();
+                if (data.success && data.progress && data.progress.status === 'processing') {
+                    const jt = data.progress.job_type;
+                    if (jt === 'batch_login') { _startOpProgress('batch-login'); return; }
+                    if (jt === 'bulk_relogin') { _startOpProgress('relogin'); return; }
+                }
+            } catch (e) { /* ignore */ }
+        } catch (e) { /* ignore */ }
+    }
+
+    // Expose for app.js to call after auth
+    App._autoDetectRunningOps = _autoDetectRunningOps;
+
     function _formatTimer(ms) {
         const s = Math.floor(ms / 1000);
         const m = Math.floor(s / 60);
@@ -1652,8 +1688,8 @@
                 _setOpStat('opStatFailed', failedCount);
                 _setOpStat('opStatPending', remaining);
 
-                // Also update main Dashboard overview
-                if (type === 'review') {
+                // Also update main Dashboard overview for ALL operation types
+                {
                     const overviewBar  = document.getElementById('progressBar');
                     const overviewPct  = document.getElementById('progressPercentage');
                     const overviewTxt  = document.getElementById('progressText');
@@ -1661,11 +1697,11 @@
                     const overviewStep = document.getElementById('stepIndicator');
                     if (overviewBar) overviewBar.style.width = pct + '%';
                     if (overviewPct) overviewPct.innerText = pct + '%';
-                    if (overviewTxt) overviewTxt.innerText = `Write Review: ${done} / ${total}`;
+                    if (overviewTxt) overviewTxt.innerText = `${cfg.label}: ${done} / ${total}`;
                     if (overviewCur) overviewCur.innerText = isRunning
-                        ? `WRITE REVIEW RUNNING... (${done}/${total})`
-                        : 'WRITE REVIEW COMPLETE';
-                    if (overviewStep) overviewStep.innerText = 'WRITE REVIEW';
+                        ? `${cfg.label.toUpperCase()} RUNNING... (${done}/${total})`
+                        : `${cfg.label.toUpperCase()} COMPLETE`;
+                    if (overviewStep) overviewStep.innerText = cfg.label.toUpperCase();
                     const _updCard = (id, val, lbl, ico) => {
                         const el = document.getElementById(id);
                         if (!el) return;
@@ -1678,9 +1714,9 @@
                         if (icoEl) icoEl.className = 'fas ' + ico;
                     };
                     _updCard('totalAccounts', total,        'Total Profiles',  'fa-users');
-                    _updCard('totalSuccess',  successCount, 'Posted',          'fa-check-circle');
-                    _updCard('totalFailed',   failedCount,  'Failed',          'fa-times-circle');
-                    _updCard('totalPending',  remaining,    'Remaining',       'fa-hourglass-half');
+                    _updCard('totalSuccess',  successCount, cfg.successLbl,    'fa-check-circle');
+                    _updCard('totalFailed',   failedCount,  cfg.failLbl,       'fa-times-circle');
+                    _updCard('totalPending',  remaining,    cfg.pendingLbl,    'fa-hourglass-half');
                 }
 
                 if (!isRunning) {

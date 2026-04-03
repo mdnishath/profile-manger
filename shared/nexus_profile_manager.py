@@ -2617,11 +2617,13 @@ def do_all_appeal_profiles(num_workers: int = 5, **kwargs) -> dict:
 
 def get_appeal_status() -> dict:
     from shared import profile_manager as _old_pm
+    _sync_state_to_old(_old_pm)
     return _old_pm.get_appeal_status()
 
 
 def stop_appeal() -> dict:
     from shared import profile_manager as _old_pm
+    _sync_state_to_old(_old_pm)
     return _old_pm.stop_appeal()
 
 
@@ -2790,6 +2792,7 @@ def _bulk_relogin_worker(profiles: list, num_workers: int):
 
 def stop_health() -> dict:
     from shared import profile_manager as _old_pm
+    _sync_state_to_old(_old_pm)
     return _old_pm.stop_health()
 
 
@@ -2808,6 +2811,7 @@ def run_health_activity(num_workers: int = 3, activities: list = None,
 
 def get_health_status() -> dict:
     from shared import profile_manager as _old_pm
+    _sync_state_to_old(_old_pm)
     return _old_pm.get_health_status()
 
 
@@ -3353,4 +3357,5 @@ def do_write_review_profiles(
 def get_review_status() -> dict:
     """Get Write Review progress status."""
     from shared import profile_manager as _pm
+    _sync_state_to_old(_pm)
     return _pm.get_review_status()

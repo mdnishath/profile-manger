@@ -252,6 +252,11 @@
 
         // Auto-detect if backend is already running
         App.autoDetectServer();
+
+        // Auto-detect running operations (restores progress panel after refresh)
+        setTimeout(() => {
+            if (App._autoDetectRunningOps) App._autoDetectRunningOps();
+        }, 2000);
     }
 
     document.addEventListener('DOMContentLoaded', init);
