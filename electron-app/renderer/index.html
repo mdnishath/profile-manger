@@ -204,86 +204,40 @@
         <div class="page" id="results">
             <div class="page-header">
                 <h1><i class="fas fa-chart-bar" style="margin-right:8px;color:var(--primary);"></i>Reports</h1>
-                <p>Generate, view, and manage reports for all operations.</p>
+                <p>Generate clean reports from raw output files. Manage all reports here.</p>
             </div>
 
-            <!-- Quick Generate Cards -->
-            <div class="rpt-gen-grid">
-                <div class="rpt-gen-card" style="--accent:#60a5fa;">
-                    <div class="rpt-gen-icon"><i class="fas fa-users"></i></div>
-                    <div class="rpt-gen-info">
-                        <div class="rpt-gen-title">All Profiles</div>
-                        <div class="rpt-gen-desc">Appeal + Health combined</div>
-                    </div>
-                    <button class="btn btn-sm rpt-gen-btn" data-source="profiles"><i class="fas fa-file-export"></i> Generate</button>
+            <!-- Toolbar -->
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;">
+                <button class="btn btn-secondary btn-sm" id="refreshReportsBtn"><i class="fas fa-sync-alt"></i> Refresh</button>
+                <div style="flex:1;"></div>
+                <button class="btn btn-danger btn-sm" id="deleteAllReportsBtn"><i class="fas fa-trash-alt"></i> Delete All</button>
+            </div>
+
+            <!-- Pro Reports section -->
+            <div id="proReportsSection" style="display:none;">
+                <div class="rpt-section-header">
+                    <i class="fas fa-crown" style="color:#fbbf24;"></i>
+                    <span>Pro Reports</span>
+                    <span id="proReportCount" class="rpt-count-badge">0</span>
                 </div>
-                <div class="rpt-gen-card" style="--accent:#fbbf24;">
-                    <div class="rpt-gen-icon"><i class="fas fa-gavel"></i></div>
-                    <div class="rpt-gen-info">
-                        <div class="rpt-gen-title">Appeal</div>
-                        <div class="rpt-gen-desc">Appeal submission results</div>
-                    </div>
-                    <button class="btn btn-sm rpt-gen-btn" data-source="appeal"><i class="fas fa-file-export"></i> Generate</button>
+                <div id="proReportsList"></div>
+            </div>
+
+            <!-- Raw Output section -->
+            <div id="rawOutputSection" style="margin-top:16px;">
+                <div class="rpt-section-header">
+                    <i class="fas fa-database" style="color:#94a3b8;"></i>
+                    <span>Raw Output</span>
+                    <span id="rawOutputCount" class="rpt-count-badge">0</span>
                 </div>
-                <div class="rpt-gen-card" style="--accent:#4ade80;">
-                    <div class="rpt-gen-icon"><i class="fas fa-heartbeat"></i></div>
-                    <div class="rpt-gen-info">
-                        <div class="rpt-gen-title">Health</div>
-                        <div class="rpt-gen-desc">Health activity results</div>
-                    </div>
-                    <button class="btn btn-sm rpt-gen-btn" data-source="health"><i class="fas fa-file-export"></i> Generate</button>
-                </div>
-                <div class="rpt-gen-card" style="--accent:#c084fc;">
-                    <div class="rpt-gen-icon"><i class="fas fa-shield-alt"></i></div>
-                    <div class="rpt-gen-info">
-                        <div class="rpt-gen-title">Step 2 — Security</div>
-                        <div class="rpt-gen-desc">Password, 2FA, recovery</div>
-                    </div>
-                    <button class="btn btn-sm rpt-gen-btn" data-source="step2"><i class="fas fa-file-export"></i> Generate</button>
-                </div>
-                <div class="rpt-gen-card" style="--accent:#f472b6;">
-                    <div class="rpt-gen-icon"><i class="fas fa-star"></i></div>
-                    <div class="rpt-gen-info">
-                        <div class="rpt-gen-title">Step 3 — Reviews</div>
-                        <div class="rpt-gen-desc">Google Maps review results</div>
-                    </div>
-                    <button class="btn btn-sm rpt-gen-btn" data-source="step3"><i class="fas fa-file-export"></i> Generate</button>
-                </div>
-                <div class="rpt-gen-card" style="--accent:#38bdf8;">
-                    <div class="rpt-gen-icon"><i class="fas fa-cog"></i></div>
-                    <div class="rpt-gen-info">
-                        <div class="rpt-gen-title">Step 1 — Language</div>
-                        <div class="rpt-gen-desc">Language & activity fix</div>
-                    </div>
-                    <button class="btn btn-sm rpt-gen-btn" data-source="step1"><i class="fas fa-file-export"></i> Generate</button>
-                </div>
-                <div class="rpt-gen-card" style="--accent:#fb923c;">
-                    <div class="rpt-gen-icon"><i class="fas fa-gavel"></i></div>
-                    <div class="rpt-gen-info">
-                        <div class="rpt-gen-title">Step 4 — Appeals</div>
-                        <div class="rpt-gen-desc">Account appeal output</div>
-                    </div>
-                    <button class="btn btn-sm rpt-gen-btn" data-source="step4"><i class="fas fa-file-export"></i> Generate</button>
+                <div id="rawOutputList">
+                    <div style="color:#64748b;font-style:italic;padding:20px 0;">No output files found.</div>
                 </div>
             </div>
 
-            <!-- Report History -->
-            <div class="card glass" style="margin-top:16px;">
-                <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
-                    <h3 style="margin:0;"><i class="fas fa-history" style="margin-right:6px;color:#94a3b8;"></i> Report History</h3>
-                    <div style="display:flex; gap:8px; align-items:center;">
-                        <button class="btn btn-secondary btn-sm" id="refreshReportsBtn" title="Refresh list">
-                            <i class="fas fa-sync-alt"></i> Refresh
-                        </button>
-                        <button class="btn btn-danger btn-sm" id="deleteAllReportsBtn">
-                            <i class="fas fa-trash-alt"></i> Delete All
-                        </button>
-                    </div>
-                </div>
-                <div id="reportsList">
-                    <div style="color:#64748b; font-style:italic; padding:20px 0;">No reports yet. Generate one above.</div>
-                </div>
-            </div>
+            <!-- Keep hidden reportsList for backward compat -->
+            <div id="reportsList" style="display:none;"></div>
 
             <!-- XLS Template Generator -->
             <div class="card glass" style="margin-top:16px;">

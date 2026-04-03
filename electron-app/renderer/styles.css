@@ -357,64 +357,65 @@ select option { background: #1a1a2e; color: #fff; }
 .tag-signout { background: rgba(248,113,113,0.15); color: #f87171; border: 1px solid rgba(248,113,113,0.3); }
 .log-entry.warning .msg { color: var(--warning); }
 
-/* Report Generate Grid */
-.rpt-gen-grid {
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-    gap: 10px;
+/* Report Section Headers */
+.rpt-section-header {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 14px; font-weight: 700; color: #e2e8f0;
+    margin-bottom: 12px; padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
 }
-.rpt-gen-card {
-    display: flex; align-items: center; gap: 12px;
-    padding: 14px 16px; border-radius: 10px;
-    background: rgba(255,255,255,0.025);
-    border: 1px solid rgba(255,255,255,0.07);
-    transition: border-color 0.15s, background 0.15s;
+.rpt-count-badge {
+    font-size: 11px; font-weight: 600; color: #94a3b8;
+    background: rgba(255,255,255,0.06); border-radius: 10px;
+    padding: 1px 8px; min-width: 20px; text-align: center;
 }
-.rpt-gen-card:hover {
-    border-color: var(--accent, rgba(255,255,255,0.15));
-    background: rgba(255,255,255,0.04);
-}
-.rpt-gen-icon {
-    width: 36px; height: 36px; border-radius: 9px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 15px; flex-shrink: 0;
-    background: color-mix(in srgb, var(--accent) 15%, transparent);
-    color: var(--accent);
-}
-.rpt-gen-info { flex: 1; min-width: 0; }
-.rpt-gen-title { font-size: 13px; font-weight: 700; color: #e2e8f0; }
-.rpt-gen-desc { font-size: 11px; color: #64748b; margin-top: 1px; }
-.rpt-gen-btn {
-    flex-shrink: 0; font-size: 11px; padding: 5px 12px;
-    background: color-mix(in srgb, var(--accent) 12%, transparent);
-    color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
-    border-radius: 6px; cursor: pointer; font-weight: 600;
-    transition: background 0.15s;
-}
-.rpt-gen-btn:hover { background: color-mix(in srgb, var(--accent) 22%, transparent); }
 
-/* Reports List */
-.report-item {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 16px 20px; border: 1px solid var(--border); border-radius: var(--radius-btn);
-    background: #0d0d0d; margin-bottom: 12px; transition: var(--transition); cursor: pointer;
+/* Reports — Item Cards */
+.rpt-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 18px; border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 10px; background: rgba(255,255,255,0.02);
+    margin-bottom: 8px; transition: border-color 0.15s, background 0.15s;
+    gap: 12px;
 }
-.report-item:hover { border-color: var(--border-strong); background: #111; transform: translateX(4px); }
-.report-title { font-size: 14px; font-weight: 500; color: #fff; margin-bottom: 4px; }
-.report-meta { font-size: 12px; color: var(--text-muted); }
-.report-badge {
-    display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 8px;
-    border-radius: 4px; margin-right: 8px; text-transform: uppercase; letter-spacing: 0.5px;
+.rpt-item:hover { border-color: rgba(255,255,255,0.14); background: rgba(255,255,255,0.04); }
+.rpt-item-pro { border-color: rgba(74,222,128,0.15); background: rgba(74,222,128,0.03); }
+.rpt-item-pro:hover { border-color: rgba(74,222,128,0.3); }
+.rpt-item-left { flex: 1; min-width: 0; }
+.rpt-item-badges { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; flex-wrap: wrap; }
+.rpt-item-name {
+    font-size: 13px; font-weight: 600; color: #e2e8f0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.badge-pro { background: rgba(74,222,128,0.15); color: #4ade80; border: 1px solid rgba(74,222,128,0.3); }
-.badge-raw { background: rgba(148,163,184,0.12); color: #94a3b8; border: 1px solid rgba(148,163,184,0.2); }
-.report-action {
-    display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px;
-    border-radius: var(--radius-btn); font-size: 12px; font-weight: 500;
-    cursor: pointer; transition: var(--transition); border: 1px solid var(--border);
-    color: var(--text-muted); background: transparent;
+.rpt-item-meta { font-size: 11px; color: #64748b; margin-top: 3px; }
+.rpt-item-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+
+/* Report badges */
+.rpt-badge {
+    display: inline-block; font-size: 9px; font-weight: 800; padding: 2px 8px;
+    border-radius: 4px; text-transform: uppercase; letter-spacing: 0.6px;
 }
-.report-action:hover { color: #fff; border-color: var(--border-strong); background: rgba(255,255,255,0.05); }
-.report-open-btn:hover { color: var(--primary); border-color: var(--primary); }
+.rpt-badge-report { background: rgba(99,102,241,0.2); color: #818cf8; border: 1px solid rgba(99,102,241,0.3); }
+.rpt-badge-pro { background: rgba(74,222,128,0.15); color: #4ade80; border: 1px solid rgba(74,222,128,0.3); }
+.rpt-badge-raw { background: rgba(148,163,184,0.1); color: #94a3b8; border: 1px solid rgba(148,163,184,0.2); }
+.rpt-tag {
+    display: inline-block; font-size: 9px; font-weight: 700; padding: 1px 7px;
+    border-radius: 4px; border: 1px solid;
+}
+
+/* Report action buttons */
+.rpt-act-btn {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 6px 14px; border-radius: 6px; font-size: 11px; font-weight: 600;
+    cursor: pointer; transition: background 0.15s, border-color 0.15s;
+    border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04);
+    color: #94a3b8; white-space: nowrap;
+}
+.rpt-act-btn:hover { background: rgba(255,255,255,0.08); color: #e2e8f0; border-color: rgba(255,255,255,0.2); }
+.rpt-gen-btn { color: #4ade80; border-color: rgba(34,197,94,0.3); background: rgba(34,197,94,0.08); }
+.rpt-gen-btn:hover { background: rgba(34,197,94,0.18); }
+.rpt-del-btn { color: #64748b; }
+.rpt-del-btn:hover { color: #f87171; border-color: rgba(239,68,68,0.3); background: rgba(239,68,68,0.08); }
 .report-delete-btn:hover { color: var(--danger); border-color: var(--danger); }
 
 /* About */

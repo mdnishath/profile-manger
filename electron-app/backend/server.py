@@ -797,8 +797,20 @@ def generate_mailnexus_report():
                 'message': f'{label.title()} report generated: {Path(report_path).name} ({len(accounts_data)} accounts)'
             })
 
+        elif source == 'file':
+            # ── Generate from a specific raw output file ──
+            file_path = data.get('file_path', '')
+            if not file_path or not Path(file_path).exists():
+                return jsonify({'success': False, 'message': 'File not found.'})
+            report_path = generate_from_excel(file_path)
+            return jsonify({
+                'success': True,
+                'report_path': str(report_path),
+                'message': f'Pro report generated: {Path(report_path).name}'
+            })
+
         else:
-            # ── Legacy: generate from step-processing output Excel ──
+            # ── Legacy: generate from latest output Excel ──
             output_file = (
                 data.get('output_file')
                 or processing_state.get('output_file_path')
@@ -807,13 +819,13 @@ def generate_mailnexus_report():
             step_name = data.get('step', '')
 
             if not output_file or not Path(output_file).exists():
-                return jsonify({'success': False, 'message': 'No output file found. Run a step operation first, or choose "All Profiles / Appeal / Health" from the dropdown.'})
+                return jsonify({'success': False, 'message': 'No output file found.'})
 
             report_path = generate_from_excel(output_file, step_name=step_name)
             return jsonify({
                 'success': True,
                 'report_path': str(report_path),
-                'message': f'MailNexus Pro report generated: {Path(report_path).name}'
+                'message': f'Pro report generated: {Path(report_path).name}'
             })
 
     except PermissionError:
