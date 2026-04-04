@@ -492,8 +492,8 @@ async def execute_login_flow(page, account, worker_id, login_url, detector=None,
         if not _clicked_email_next:
             # Last resort: click any visible button-like element
             await page.locator('#identifierNext, button[type="submit"]').first.click(timeout=5000)
-        _log(worker_id, "STEP[2/4] EMAIL: Clicked Next. Waiting 5s...")
-        await asyncio.sleep(5)
+        _log(worker_id, "STEP[2/4] EMAIL: Clicked Next. Waiting 8s for page load (proxy latency)...")
+        await asyncio.sleep(8)
         _log(worker_id, f"STEP[2/4] EMAIL: After Next. URL = {page.url[:100]}")
 
         # POST-EMAIL: CAPTCHA check
@@ -533,8 +533,8 @@ async def execute_login_flow(page, account, worker_id, login_url, detector=None,
                 except Exception:
                     continue
             if pk_clicked:
-                _log(worker_id, "STEP[2/4] EMAIL: Waiting 4s after passkey skip...")
-                await asyncio.sleep(4)
+                _log(worker_id, "STEP[2/4] EMAIL: Waiting 6s after passkey skip (proxy latency)...")
+                await asyncio.sleep(6)
                 _log(worker_id, f"STEP[2/4] EMAIL: After passkey skip. URL = {page.url[:100]}")
 
                 # After "Try another way", Google may show a METHOD SELECTION page
@@ -569,8 +569,8 @@ async def execute_login_flow(page, account, worker_id, login_url, detector=None,
                         except Exception:
                             continue
                     if pw_option_clicked:
-                        _log(worker_id, "STEP[2/4] EMAIL: Waiting 4s for password page...")
-                        await asyncio.sleep(4)
+                        _log(worker_id, "STEP[2/4] EMAIL: Waiting 6s for password page (proxy latency)...")
+                        await asyncio.sleep(6)
                         _log(worker_id, f"STEP[2/4] EMAIL: After password option. URL = {page.url[:100]}")
                     else:
                         _log(worker_id, "STEP[2/4] EMAIL: WARNING - Could not find 'Enter your password' option")
@@ -580,80 +580,86 @@ async def execute_login_flow(page, account, worker_id, login_url, detector=None,
         # ============================================================
         # STEP 3: Enter password (MANDATORY)
         # ============================================================
-        # Try up to 3 times with 3s waits — password field may take time
-        # to appear after passkey skip or method selection.
+        # Smart wait: use wait_for on password field with proper timeout.
+        # Handle passkey/method-selection screens between attempts.
         _log(worker_id, "STEP[3/4] PASSWORD: Looking for password input field...")
         pwd_selectors = ['input[type="password"]', 'input[name="Passwd"]']
         pwd_filled = False
 
-        for pwd_attempt in range(1, 4):
+        for pwd_attempt in range(1, 5):  # 4 attempts total
+            # First: try to wait for password field to appear (smart wait)
             for sel in pwd_selectors:
                 try:
                     elem = page.locator(sel).first
-                    count = await elem.count()
-                    visible = await elem.is_visible() if count > 0 else False
-                    if count > 0 and visible:
-                        await elem.fill(password)
-                        _log(worker_id, f"STEP[3/4] PASSWORD: Filled password via '{sel}' (attempt {pwd_attempt})")
-                        pwd_filled = True
-                        break
-                except:
+                    await elem.wait_for(state='visible', timeout=8000)  # 8s smart wait
+                    await elem.fill(password)
+                    _log(worker_id, f"STEP[3/4] PASSWORD: Filled password via '{sel}' (attempt {pwd_attempt})")
+                    pwd_filled = True
+                    break
+                except Exception:
                     continue
             if pwd_filled:
                 break
 
-            if pwd_attempt < 3:
-                _log(worker_id, f"STEP[3/4] PASSWORD: Attempt {pwd_attempt}/3 — password field not found, waiting 3s...")
+            # Password field not visible — check what screen we're on
+            mid_screen = await detector.detect_current_screen()
+            _log(worker_id, f"STEP[3/4] PASSWORD: Attempt {pwd_attempt}/4 — field not found, screen={mid_screen.name}, URL={page.url[:80]}")
 
-                # On intermediate attempts, check for passkey/selection screens
-                mid_screen = await detector.detect_current_screen()
-                _log(worker_id, f"STEP[3/4] PASSWORD: Mid-check screen = {mid_screen.name}, URL = {page.url[:80]}")
+            if mid_screen == LoginScreen.PASSKEY_PROMPT:
+                _log(worker_id, "STEP[3/4] PASSWORD: Passkey screen — clicking 'Try another way'...")
+                for pk_sel in [
+                    '[jsname="Njthtb"]', '[jsname="PvB1Bd"]', '[jsname="EBHGs"]',
+                    'button:has-text("Try another way")', 'button:has-text("Try another method")',
+                    'button:has-text("Essayer une autre")',
+                    'a:has-text("Try another way")', 'a:has-text("Essayer une autre")',
+                    'div[role="link"]:has-text("Try another way")',
+                    'div[role="link"]:has-text("Essayer")',
+                    'button:has-text("Not now")', 'button:has-text("Pas maintenant")',
+                    'a:has-text("Not now")', 'a:has-text("Pas maintenant")',
+                ]:
+                    try:
+                        pk_btn = page.locator(pk_sel).first
+                        if await pk_btn.count() > 0 and await pk_btn.is_visible():
+                            await pk_btn.click()
+                            _log(worker_id, f"STEP[3/4] PASSWORD: Clicked: {pk_sel}")
+                            await asyncio.sleep(5)  # wait for navigation after click
+                            break
+                    except Exception:
+                        continue
 
-                if mid_screen == LoginScreen.PASSKEY_PROMPT:
-                    _log(worker_id, "STEP[3/4] PASSWORD: Still on passkey screen — clicking 'Try another way'...")
-                    for pk_sel in [
-                        '[jsname="Njthtb"]', '[jsname="PvB1Bd"]', '[jsname="EBHGs"]',
-                        'button:has-text("Try another way")', 'button:has-text("Try another method")',
-                        'button:has-text("Essayer une autre")',
-                        'a:has-text("Try another way")', 'a:has-text("Essayer une autre")',
-                        'div[role="link"]:has-text("Try another way")',
-                        'div[role="link"]:has-text("Essayer")',
-                        'button:has-text("Not now")', 'button:has-text("Pas maintenant")',
-                        'a:has-text("Not now")', 'a:has-text("Pas maintenant")',
-                    ]:
-                        try:
-                            pk_btn = page.locator(pk_sel).first
-                            if await pk_btn.count() > 0 and await pk_btn.is_visible():
-                                await pk_btn.click()
-                                _log(worker_id, f"STEP[3/4] PASSWORD: Clicked: {pk_sel}")
-                                break
-                        except Exception:
-                            continue
+            elif mid_screen in (LoginScreen.ACCOUNT_RECOVERY, LoginScreen.TRY_ANOTHER_WAY):
+                _log(worker_id, "STEP[3/4] PASSWORD: Method selection page — clicking password option...")
+                for pw_opt in [
+                    'li:has-text("Enter your password")',
+                    'li:has-text("mot de passe")',
+                    'li:has-text("password")',
+                    'div[role="link"]:has-text("password")',
+                    'div[role="link"]:has-text("mot de passe")',
+                    '[data-challengetype]:has-text("password")',
+                    '[data-challengetype]:has-text("mot de passe")',
+                ]:
+                    try:
+                        opt = page.locator(pw_opt).first
+                        if await opt.count() > 0 and await opt.is_visible():
+                            await opt.click()
+                            _log(worker_id, f"STEP[3/4] PASSWORD: Clicked: {pw_opt}")
+                            await asyncio.sleep(5)  # wait for password page to load
+                            break
+                    except Exception:
+                        continue
 
-                elif mid_screen in (LoginScreen.ACCOUNT_RECOVERY, LoginScreen.TRY_ANOTHER_WAY):
-                    _log(worker_id, "STEP[3/4] PASSWORD: On selection page — clicking password option...")
-                    for pw_opt in [
-                        'li:has-text("Enter your password")',
-                        'li:has-text("mot de passe")',
-                        'li:has-text("password")',
-                        'div[role="link"]:has-text("password")',
-                        'div[role="link"]:has-text("mot de passe")',
-                        '[data-challengetype]:has-text("password")',
-                        '[data-challengetype]:has-text("mot de passe")',
-                    ]:
-                        try:
-                            opt = page.locator(pw_opt).first
-                            if await opt.count() > 0 and await opt.is_visible():
-                                await opt.click()
-                                _log(worker_id, f"STEP[3/4] PASSWORD: Clicked: {pw_opt}")
-                                break
-                        except Exception:
-                            continue
+            elif mid_screen == LoginScreen.PASSWORD_INPUT:
+                # Screen says password but field wasn't found — give more time
+                _log(worker_id, "STEP[3/4] PASSWORD: On password page but field not ready, waiting 5s...")
+                await asyncio.sleep(5)
 
-                await asyncio.sleep(3)
+            else:
+                # Unknown screen — wait and retry
+                _log(worker_id, f"STEP[3/4] PASSWORD: Unexpected screen, waiting 5s...")
+                await asyncio.sleep(5)
 
         if not pwd_filled:
-            _log(worker_id, "STEP[3/4] PASSWORD: FAILED - Could not find password input after 3 attempts!")
+            _log(worker_id, "STEP[3/4] PASSWORD: FAILED - Could not find password input after 4 attempts!")
             _log(worker_id, f"STEP[3/4] PASSWORD: Final URL = {page.url[:100]}")
             raise Exception("Could not enter password - input field not found")
 
