@@ -2651,7 +2651,7 @@ def relogin_profile(profile_id: str) -> dict:
 # ── Bulk Re-login with concurrency control ────────────────────────────────────
 
 # Global semaphore: limit simultaneous NST browser launches to avoid API overload
-_nst_launch_sem = threading.Semaphore(2)   # max 2 concurrent NST browser launches
+_nst_launch_sem = threading.Semaphore(5)   # default; overridden per bulk-relogin call
 
 _bulk_relogin_status: dict = {
     'running': False, 'total': 0, 'done': 0, 'success': 0, 'failed': 0,
@@ -2712,6 +2712,10 @@ def bulk_relogin_profiles(ids: list, num_workers: int = 2) -> dict:
         'success': 0, 'failed': 0, 'status': 'processing',
         'current_account': '', 'report_path': ''
     })
+
+    # Update semaphore to match requested worker count
+    global _nst_launch_sem
+    _nst_launch_sem = threading.Semaphore(num_workers)
 
     t = threading.Thread(
         target=_bulk_relogin_worker,
