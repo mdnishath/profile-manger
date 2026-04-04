@@ -142,20 +142,24 @@ def _nst_post(path: str, body: dict | None = None, timeout: int = 30) -> dict | 
     return None
 
 
-def _nst_delete(path: str, timeout: int = 15) -> dict | None:
-    """DELETE request to NST API."""
+def _nst_delete(path: str, timeout: int = 5) -> dict | None:
+    """DELETE request to NST API. Fast timeout — don't block on failures."""
     try:
         r = requests.delete(f'{_nst_api_base}{path}', headers=_nst_headers(),
                             timeout=timeout)
         if r.status_code == 200:
             return r.json()
-        # 400 "browser instance not found" is expected when browser already closed
+        # 400 "browser instance not found" / 403 auth / 502 server error — all non-fatal
         if r.status_code == 400 and 'not found' in r.text.lower():
-            _log(f"NST DELETE {path}: browser already closed", 'info')
+            pass  # already closed — expected
+        elif r.status_code in (403, 502):
+            pass  # NST auth/server issue — skip silently, local delete still proceeds
         else:
-            _log(f"NST DELETE {path} -> {r.status_code}: {r.text[:200]}", 'warning')
+            _log(f"NST DELETE {path} -> {r.status_code}", 'warning')
     except requests.ConnectionError:
         pass  # NST not running — expected for offline profiles
+    except requests.Timeout:
+        pass  # NST slow — skip, local delete still proceeds
     except Exception as e:
         _log(f"NST DELETE {path} error: {e}", 'error')
     return None
@@ -1107,12 +1111,13 @@ def delete_profile(profile_id: str) -> bool:
         if not target:
             return False
 
-        # Delete from NST (only for NST engine profiles)
+        # Delete from NST (only for NST engine profiles) — best-effort, don't block
         if target.get('engine', 'nst') == 'nst':
             nst_id = target.get('nst_profile_id', profile_id)
             if nst_id and not nst_id.startswith('local-'):
-                _nst_delete(f'/profiles/{nst_id}')
-                _nst_delete(f'/local/profiles/{nst_id}')
+                result = _nst_delete(f'/profiles/{nst_id}')
+                if result is None:
+                    _nst_delete(f'/local/profiles/{nst_id}')  # fallback only if cloud delete failed
 
         # Delete local profile dir
         profile_dir = target.get('profile_dir', '')

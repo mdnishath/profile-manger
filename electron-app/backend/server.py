@@ -2230,18 +2230,69 @@ def profiles_delete_by_engine(engine):
         return jsonify({'success': False, 'message': str(e)}), 500
 
 
+_bulk_delete_progress = {
+    'running': False, 'status': 'idle',
+    'total': 0, 'deleted': 0, 'failed': 0, 'pending': 0,
+    'current_profile': '',
+}
+
 @app.route('/api/profiles/delete-bulk', methods=['DELETE'])
 def profiles_delete_bulk():
-    """Delete multiple profiles by IDs."""
+    """Delete multiple profiles by IDs with progress tracking."""
+    global _bulk_delete_progress
     data = request.get_json() or {}
     ids = data.get('ids', [])
     if not ids:
         return jsonify({'success': False, 'message': 'No profile IDs provided'}), 400
-    deleted = 0
-    for pid in ids:
-        if profile_manager.delete_profile(pid):
-            deleted += 1
-    return jsonify({'success': True, 'deleted': deleted, 'message': f'Deleted {deleted} profile(s)'})
+
+    if _bulk_delete_progress.get('running'):
+        return jsonify({'success': False, 'message': 'Bulk delete already running'}), 409
+
+    # Set progress BEFORE spawning thread
+    _bulk_delete_progress.update({
+        'running': True, 'status': 'processing',
+        'total': len(ids), 'deleted': 0, 'failed': 0, 'pending': len(ids),
+        'current_profile': '',
+    })
+
+    def _worker():
+        global _bulk_delete_progress
+        deleted = 0
+        failed = 0
+        for pid in ids:
+            # Get profile name for progress display
+            try:
+                p = profile_manager.get_profile(pid)
+                name = p.get('name', p.get('email', pid)) if p else pid
+            except Exception:
+                name = pid
+            _bulk_delete_progress['current_profile'] = name
+            try:
+                if profile_manager.delete_profile(pid):
+                    deleted += 1
+                else:
+                    failed += 1
+            except Exception:
+                failed += 1
+            _bulk_delete_progress.update({
+                'deleted': deleted, 'failed': failed,
+                'pending': max(0, len(ids) - deleted - failed),
+            })
+        _bulk_delete_progress.update({
+            'running': False, 'status': 'completed',
+            'deleted': deleted, 'failed': failed, 'pending': 0,
+            'current_profile': '',
+        })
+
+    import threading
+    threading.Thread(target=_worker, daemon=True, name='bulk-delete').start()
+    return jsonify({'success': True, 'total': len(ids), 'message': 'Bulk delete started'})
+
+
+@app.route('/api/profiles/delete-bulk-status', methods=['GET'])
+def profiles_delete_bulk_status():
+    """Return current bulk delete progress."""
+    return jsonify({'success': True, 'progress': dict(_bulk_delete_progress)})
 
 
 @app.route('/api/profiles/<profile_id>', methods=['DELETE'])

@@ -851,10 +851,9 @@
                 body: JSON.stringify({ ids: [..._selectedIds] })
             });
             if (data.success) {
-                App.toast(`Deleted ${data.deleted || 0} profile(s)`, 'success');
                 _selectedIds.clear();
                 _updateBulkBar();
-                loadProfiles();
+                _startOpProgress('delete');
             } else App.toast(data.message || 'Delete failed', 'error');
         } catch (e) { App.toast('Delete error', 'error'); }
     }
@@ -1654,6 +1653,7 @@
         'proxy':       { icon: 'fa-plug',         label: 'Proxy Update',   successLbl: 'Updated',     failLbl: 'Failed',  pendingLbl: 'Remaining' },
         'health':      { icon: 'fa-heartbeat',    label: 'Health Activity', successLbl: 'Done',       failLbl: 'Failed',  pendingLbl: 'Remaining' },
         'setai':       { icon: 'fa-robot',        label: 'SetAI Hook',     successLbl: 'Hooked',      failLbl: 'Failed',  pendingLbl: 'Remaining' },
+        'delete':      { icon: 'fa-trash',        label: 'Delete Profiles', successLbl: 'Deleted',    failLbl: 'Failed',  pendingLbl: 'Remaining' },
     };
 
     // Auto-detect running operations on page load / refresh
@@ -1676,6 +1676,14 @@
                     }
                 } catch (e) { /* ignore */ }
             }
+            // Check bulk delete progress
+            try {
+                const delRes = await App.apiFetch('/api/profiles/delete-bulk-status');
+                const delData = await delRes.json();
+                if (delData.success && delData.progress && delData.progress.status === 'processing') {
+                    _startOpProgress('delete'); return;
+                }
+            } catch (e) { /* ignore */ }
             // Check main progress endpoint for batch login / relogin
             try {
                 const res = await App.apiFetch('/api/progress');
@@ -1771,7 +1779,18 @@
                 let done = 0, total = 0, successCount = 0, failedCount = 0, isRunning = true;
                 let reportPath = null;
 
-                if (type === 'batch-login' || type === 'relogin') {
+                if (type === 'delete') {
+                    // Bulk delete progress endpoint
+                    const st = await _api('/api/profiles/delete-bulk-status');
+                    if (st.success && st.progress) {
+                        const p = st.progress;
+                        total = p.total || 0;
+                        done = (p.deleted || 0) + (p.failed || 0);
+                        successCount = p.deleted || 0;
+                        failedCount = p.failed || 0;
+                        isRunning = p.status === 'processing';
+                    }
+                } else if (type === 'batch-login' || type === 'relogin') {
                     // These use the main progress endpoint
                     const res = await App.apiFetch('/api/progress');
                     const data = await res.json();
@@ -1871,6 +1890,8 @@
                         _showReviewReportReady(reportPath, done, total);
                     } else if (type === 'review') {
                         App.toast(`Write Review complete: ${done}/${total} done`, 'success');
+                    } else if (type === 'delete') {
+                        App.toast(`Delete complete: ${successCount} deleted, ${failedCount} failed`, 'success');
                     } else if (type === 'batch-login') {
                         App.toast(`Batch Login complete: ${successCount} logged in, ${failedCount} failed`, 'success');
                     } else if (type === 'relogin') {
