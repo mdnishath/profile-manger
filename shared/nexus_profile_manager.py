@@ -2602,6 +2602,12 @@ def batch_login(file_path: str, num_workers: int = 3,
     return _old_pm.batch_login(file_path, num_workers, engine=engine, os_type=os_type, group=group)
 
 
+def get_batch_login_progress() -> dict:
+    """Return batch login progress from the delegated profile_manager."""
+    from shared import profile_manager as _old_pm
+    return _old_pm.get_batch_login_progress()
+
+
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # OPERATIONS (delegates to old module for complex operation logic)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
