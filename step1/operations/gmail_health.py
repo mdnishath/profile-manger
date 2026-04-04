@@ -3888,170 +3888,127 @@ ACTIVITY_MAP = {
 }
 
 
-async def gmail_health_activity(page, worker_id, duration_minutes=10, country='US',
+async def gmail_health_activity(page, worker_id, duration_minutes=0, country='US',
                                 activities=None, rounds=1,
                                 gmb_name='', gmb_address=''):
     """
     Run random human-like activities.
 
+    Duration is a HARD LIMIT — activities stop when time runs out.
+    If duration=0, runs all activities x rounds then stops.
+
     Args:
         page: Playwright page object (logged-in Google profile)
         worker_id: Worker number for logging
-        duration_minutes: Legacy param — only used if activities is None (fallback)
+        duration_minutes: HARD time limit in minutes. 0 = no limit (finish activities then stop).
         country: Country code for localized queries
-        activities: List of activity IDs to run (round-robin, shuffled).
-                    If None, falls back to timed duration_minutes mode.
-        rounds: Number of times to repeat the full activity list (default 1).
-        gmb_name: Business name for custom_gmb activity.
-        gmb_address: Business address for custom_gmb activity.
-
-    Returns:
-        dict with success, activities_done, activity_log
+        activities: List of activity IDs to run. If None, uses defaults.
+        rounds: Repeat activity list N times (ignored if duration reached first).
+        gmb_name: Business name for GMB-aware queries.
+        gmb_address: Business address for GMB-aware queries.
     """
-    if activities:
-        # New mode: run each activity once per round in random order
-        _log(worker_id, f"[HEALTH] Starting health activity — {len(activities)} activities x {rounds} round(s), country={country}")
-        activities_done = 0
-        activity_log = []
+    if not activities:
+        activities = ['search_restaurants', 'search_news', 'gmail_inbox',
+                      'youtube_browse_feed', 'maps_search_restaurants', 'news_headlines']
 
-        for round_num in range(rounds):
-            _log(worker_id, f"[HEALTH] === Round {round_num + 1}/{rounds} ===")
-            shuffled = list(activities)
-            random.shuffle(shuffled)
+    has_time_limit = duration_minutes > 0
+    end_time = time.time() + (duration_minutes * 60) if has_time_limit else 0
+    start_time = time.time()
 
-            for act_id in shuffled:
-                entry = ACTIVITY_MAP.get(act_id)
-                if not entry:
-                    _log(worker_id, f"[HEALTH] Unknown activity: {act_id}, skipping")
-                    continue
-                fn, variant = entry
-                try:
-                    _log(worker_id, f"[HEALTH] Round {round_num + 1} — Activity {activities_done + 1}: {act_id}")
+    _log(worker_id, f"[HEALTH] Starting — {len(activities)} activities x {rounds} round(s), "
+         f"duration={'%d min' % duration_minutes if has_time_limit else 'unlimited'}, country={country}")
 
-                    # Resolve a specific query from massive pools
-                    # Priority: country-specific dict > ACTIVITY_QUERIES[act_id] > ACTIVITY_QUERIES[variant]
-                    # Works for ALL function types (search, maps, youtube, news, shopping)
-                    specific_q = None
-                    country_queries = _ACTIVITY_QUERIES_BY_COUNTRY.get(country)
-                    if country_queries and act_id in country_queries:
-                        specific_q = random.choice(country_queries[act_id])
-                    elif act_id in ACTIVITY_QUERIES:
-                        specific_q = random.choice(ACTIVITY_QUERIES[act_id])
-                    elif variant in ACTIVITY_QUERIES:
-                        specific_q = random.choice(ACTIVITY_QUERIES[variant])
-                    # Also check prefixed variant keys for youtube/maps/news/shopping
-                    elif fn == _browse_youtube and f'yt_{variant}' in ACTIVITY_QUERIES:
-                        specific_q = random.choice(ACTIVITY_QUERIES[f'yt_{variant}'])
-                    elif fn == _browse_maps and f'maps_{variant}' in ACTIVITY_QUERIES:
-                        specific_q = random.choice(ACTIVITY_QUERIES[f'maps_{variant}'])
-                    elif fn == _browse_news and f'news_{variant}' in ACTIVITY_QUERIES:
-                        specific_q = random.choice(ACTIVITY_QUERIES[f'news_{variant}'])
-                    elif fn == _browse_shopping and f'shopping_{variant}' in ACTIVITY_QUERIES:
-                        specific_q = random.choice(ACTIVITY_QUERIES[f'shopping_{variant}'])
+    activities_done = 0
+    activity_log = []
 
-                    # Custom GMB gets special kwargs
-                    if fn == _custom_gmb_activity:
-                        await fn(page, worker_id, gmb_name=gmb_name,
-                                 gmb_address=gmb_address, country=country)
-                    else:
-                        # Pass gmb_name and gmb_address to EVERY activity
-                        kwargs = dict(country=country, gmb_name=gmb_name,
-                                      gmb_address=gmb_address)
-                        if specific_q is not None:
-                            kwargs['query'] = specific_q
-                        await fn(page, worker_id, **kwargs)
-                    activities_done += 1
-                    activity_log.append(act_id)
-                except Exception as e:
-                    _log(worker_id, f"[HEALTH] Activity {act_id} error: {e}")
+    def _time_left():
+        return (end_time - time.time()) if has_time_limit else 999
 
-                # Human-like pause between activities
-                pause = random.uniform(5.0, 20.0)
-                await asyncio.sleep(pause)
+    def _time_up():
+        return has_time_limit and time.time() >= end_time
 
-            if round_num < rounds - 1:
-                inter_round_pause = random.uniform(10.0, 30.0)
-                _log(worker_id, f"[HEALTH] Pausing {inter_round_pause:.0f}s between rounds")
-                await asyncio.sleep(inter_round_pause)
+    async def _run_one(act_id):
+        """Run a single activity. Returns True if successful."""
+        nonlocal activities_done
+        entry = ACTIVITY_MAP.get(act_id)
+        if not entry:
+            return False
+        fn, variant = entry
+        try:
+            # Resolve query from pools
+            specific_q = None
+            country_queries = _ACTIVITY_QUERIES_BY_COUNTRY.get(country)
+            if country_queries and act_id in country_queries:
+                specific_q = random.choice(country_queries[act_id])
+            elif act_id in ACTIVITY_QUERIES:
+                specific_q = random.choice(ACTIVITY_QUERIES[act_id])
+            elif variant in ACTIVITY_QUERIES:
+                specific_q = random.choice(ACTIVITY_QUERIES[variant])
+            elif fn == _browse_youtube and f'yt_{variant}' in ACTIVITY_QUERIES:
+                specific_q = random.choice(ACTIVITY_QUERIES[f'yt_{variant}'])
+            elif fn == _browse_maps and f'maps_{variant}' in ACTIVITY_QUERIES:
+                specific_q = random.choice(ACTIVITY_QUERIES[f'maps_{variant}'])
+            elif fn == _browse_news and f'news_{variant}' in ACTIVITY_QUERIES:
+                specific_q = random.choice(ACTIVITY_QUERIES[f'news_{variant}'])
+            elif fn == _browse_shopping and f'shopping_{variant}' in ACTIVITY_QUERIES:
+                specific_q = random.choice(ACTIVITY_QUERIES[f'shopping_{variant}'])
 
-        total_expected = len(activities) * rounds
-        _log(worker_id, f"[HEALTH] Rounds complete — {activities_done}/{total_expected} activities done across {rounds} round(s)")
+            if fn == _custom_gmb_activity:
+                await fn(page, worker_id, gmb_name=gmb_name, gmb_address=gmb_address, country=country)
+            else:
+                kwargs = dict(country=country, gmb_name=gmb_name, gmb_address=gmb_address)
+                if specific_q is not None:
+                    kwargs['query'] = specific_q
+                await fn(page, worker_id, **kwargs)
+            activities_done += 1
+            activity_log.append(act_id)
+            return True
+        except Exception as e:
+            _log(worker_id, f"[HEALTH] {act_id} error: {e}")
+            return False
 
-        # ── Smart time-fill: if duration set and time remaining, pick random activities ──
-        if duration_minutes > 0:
-            end_time = time.time() + (duration_minutes * 60)
-            # Subtract time already spent (estimate: activities * 15s avg + pauses)
-            elapsed_estimate = activities_done * 18  # rough average seconds per activity
-            end_time = time.time() + max(0, (duration_minutes * 60) - elapsed_estimate)
+    # ── Main loop: rounds with hard time check ──
+    for round_num in range(rounds):
+        if _time_up():
+            _log(worker_id, f"[HEALTH] Time limit reached before round {round_num + 1}")
+            break
 
-            if time.time() < end_time:
-                _log(worker_id, f"[HEALTH] Time-fill: {int((end_time - time.time()) / 60)}+ min remaining, picking random activities...")
-                fill_pool = list(ACTIVITY_MAP.keys())
-                while time.time() < end_time:
-                    act_id = random.choice(fill_pool)
-                    entry = ACTIVITY_MAP.get(act_id)
-                    if not entry:
-                        continue
-                    fn, variant = entry
-                    try:
-                        specific_q = None
-                        if act_id in ACTIVITY_QUERIES:
-                            specific_q = random.choice(ACTIVITY_QUERIES[act_id])
-                        elif variant in ACTIVITY_QUERIES:
-                            specific_q = random.choice(ACTIVITY_QUERIES[variant])
-                        kwargs = dict(country=country, gmb_name=gmb_name, gmb_address=gmb_address)
-                        if specific_q:
-                            kwargs['query'] = specific_q
-                        if fn == _custom_gmb_activity:
-                            await fn(page, worker_id, gmb_name=gmb_name, gmb_address=gmb_address, country=country)
-                        else:
-                            await fn(page, worker_id, **kwargs)
-                        activities_done += 1
-                        activity_log.append(f'{act_id}(fill)')
-                        _log(worker_id, f"[HEALTH] Time-fill activity: {act_id} (#{activities_done})")
-                    except Exception as e:
-                        _log(worker_id, f"[HEALTH] Time-fill {act_id} error: {e}")
-                    await asyncio.sleep(random.uniform(5.0, 15.0))
+        _log(worker_id, f"[HEALTH] === Round {round_num + 1}/{rounds} === ({_time_left():.0f}s left)" if has_time_limit
+             else f"[HEALTH] === Round {round_num + 1}/{rounds} ===")
 
-                _log(worker_id, f"[HEALTH] Time-fill done — total {activities_done} activities in {duration_minutes} min")
+        shuffled = list(activities)
+        random.shuffle(shuffled)
 
-        _log(worker_id, f"[HEALTH] Complete — {activities_done} total activities")
-        return {
-            'success': True,
-            'activities_done': activities_done,
-            'activity_log': activity_log,
-        }
-    else:
-        # Legacy duration-based mode
-        _log(worker_id, f"[HEALTH] Starting health activity — {duration_minutes} min, country={country}")
-        end_time = time.time() + (duration_minutes * 60)
-        activities_done = 0
-        activity_log = []
+        for act_id in shuffled:
+            if _time_up():
+                _log(worker_id, f"[HEALTH] Duration {duration_minutes}min reached — stopping")
+                break
+            _log(worker_id, f"[HEALTH] Activity {activities_done + 1}: {act_id}")
+            await _run_one(act_id)
+            # Short pause (3-8s) to stay within time budget
+            await asyncio.sleep(random.uniform(3.0, 8.0))
 
-        while time.time() < end_time:
-            activity_fn = random.choice(ALL_ACTIVITIES)
-            activity_name = activity_fn.__name__.lstrip('_')
+        if _time_up():
+            break
 
-            try:
-                _log(worker_id, f"[HEALTH] Activity {activities_done + 1}: {activity_name}")
-                await activity_fn(page, worker_id, country=country,
-                                  gmb_name=gmb_name, gmb_address=gmb_address)
-                activities_done += 1
-                activity_log.append(activity_name)
-            except Exception as e:
-                _log(worker_id, f"[HEALTH] Activity {activity_name} error: {e}")
+        if round_num < rounds - 1 and not _time_up():
+            pause = random.uniform(5.0, 15.0)
+            _log(worker_id, f"[HEALTH] Round pause {pause:.0f}s")
+            await asyncio.sleep(pause)
 
-            if time.time() < end_time:
-                pause = random.uniform(5.0, 20.0)
-                remaining = end_time - time.time()
-                actual_pause = min(pause, max(remaining, 0))
-                if actual_pause > 0:
-                    await asyncio.sleep(actual_pause)
+    # ── Time-fill: if duration set and time remaining, keep going ──
+    if has_time_limit and not _time_up():
+        _log(worker_id, f"[HEALTH] Time-fill: {_time_left():.0f}s remaining, picking random activities...")
+        fill_pool = list(ACTIVITY_MAP.keys())
+        while not _time_up():
+            act_id = random.choice(fill_pool)
+            await _run_one(act_id)
+            await asyncio.sleep(random.uniform(3.0, 8.0))
 
-        _log(worker_id, f"[HEALTH] Complete — {activities_done} activities done in ~{duration_minutes} min")
-        return {
-            'success': True,
-            'activities_done': activities_done,
-            'activity_log': activity_log,
-            'duration_minutes': duration_minutes,
-        }
+    elapsed = int(time.time() - start_time)
+    _log(worker_id, f"[HEALTH] Complete — {activities_done} activities in {elapsed // 60}m {elapsed % 60}s")
+    return {
+        'success': True,
+        'activities_done': activities_done,
+        'activity_log': activity_log,
+    }
