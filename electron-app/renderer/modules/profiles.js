@@ -149,9 +149,10 @@
             // Fetch ALL profiles in one call (no pagination)
             const filterParam = _currentFilter !== 'all' ? `&filter=${_currentFilter}` : '';
             const groupParam = _currentGroup ? `&group=${encodeURIComponent(_currentGroup)}` : '';
+            const searchByParam = searchBy !== 'name' ? `&search_by=${searchBy}` : '';
             const [allData, data] = await Promise.all([
-                _api(`/api/profiles?search=${encodeURIComponent(search)}&page=1&per_page=9999`),
-                _api(`/api/profiles?search=${encodeURIComponent(search)}&page=1&per_page=9999${filterParam}${groupParam}`),
+                _api(`/api/profiles?search=${encodeURIComponent(search)}&page=1&per_page=9999${searchByParam}`),
+                _api(`/api/profiles?search=${encodeURIComponent(search)}&page=1&per_page=9999${filterParam}${groupParam}${searchByParam}`),
             ]);
 
             // Update counts from unfiltered data

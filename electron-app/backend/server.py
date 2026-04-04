@@ -2018,12 +2018,26 @@ def profiles_list():
     group_filter = request.args.get('group', '').lower()
     page = int(request.args.get('page', 1))
     per_page = int(request.args.get('per_page', 50))
-    per_page = max(10, min(per_page, 200))
+    per_page = max(10, min(per_page, 10000))  # allow loading all profiles at once
 
     profiles = profile_manager.list_profiles()
+
+    # Search filter — also search notes, proxy, and group
     if search:
-        profiles = [p for p in profiles if search in p.get('name', '').lower()
-                    or search in p.get('email', '').lower()]
+        search_by = request.args.get('search_by', 'name').lower()
+        if search_by == 'email':
+            profiles = [p for p in profiles if search in p.get('email', '').lower()]
+        elif search_by == 'notes':
+            profiles = [p for p in profiles if search in p.get('note', '').lower()]
+        elif search_by == 'proxy':
+            profiles = [p for p in profiles if search in str(p.get('proxy', {}).get('host', '')).lower()
+                        or search in str(p.get('proxy', {}).get('server', '')).lower()]
+        elif search_by == 'group':
+            profiles = [p for p in profiles if any(search in g.lower() for g in profile_manager._get_groups(p))]
+        else:
+            profiles = [p for p in profiles if search in p.get('name', '').lower()
+                        or search in p.get('email', '').lower()]
+
     if group_filter:
         profiles = [p for p in profiles if group_filter in [g.lower() for g in profile_manager._get_groups(p)]]
 
@@ -2928,7 +2942,7 @@ def napi_list_profiles():
     group_filter = request.args.get('group', '').lower()
     page = int(request.args.get('page', 1))
     per_page = int(request.args.get('per_page', 20))
-    per_page = max(1, min(per_page, 200))
+    per_page = max(1, min(per_page, 10000))
 
     profiles = profile_manager.list_profiles()
     if search:
