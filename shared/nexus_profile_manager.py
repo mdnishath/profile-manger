@@ -2715,7 +2715,7 @@ def bulk_relogin_profiles(ids: list, num_workers: int = 2) -> dict:
 
     t = threading.Thread(
         target=_bulk_relogin_worker,
-        args=(loginable, min(num_workers, 2)),   # cap at 2 to be safe with NST API
+        args=(loginable, num_workers),
         daemon=True, name='bulk-relogin'
     )
     t.start()
