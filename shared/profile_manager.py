@@ -1053,6 +1053,15 @@ def batch_login(file_path: str, num_workers: int = 3,
 
     _log(f"Batch login: {len(accounts)} accounts, {num_workers} workers, engine={engine}, os={os_type}, group={group}")
 
+    # Set progress state BEFORE spawning thread to avoid race condition
+    # (frontend polls immediately — must see 'processing' on first poll)
+    global _batch_login_progress
+    _batch_login_progress.update({
+        'running': True, 'status': 'processing',
+        'total': len(accounts), 'success': 0, 'failed': 0, 'pending': len(accounts),
+        'current_account': '', 'started_at': None,
+    })
+
     # Run in background thread
     t = threading.Thread(
         target=_batch_login_worker,
