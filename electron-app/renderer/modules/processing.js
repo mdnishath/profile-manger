@@ -133,10 +133,8 @@
         pollingInterval = setInterval(async () => {
             if (!App.state.serverOnline) return;
 
-            // Skip dashboard update if the opProgressPanel (profiles.js) is active
-            // to prevent two pollers fighting over the same DOM elements
-            const opPanel = document.getElementById('opProgressPanel');
-            if (opPanel && opPanel.style.display === 'block') return;
+            // Note: opProgressPanel also updates dashboard elements — that's fine,
+            // both sources write the same values so no conflict
 
             try {
                 const res = await App.apiFetch('/api/progress');
@@ -171,8 +169,9 @@
                     }
 
                     // Progress bar (smooth)
-                    if (p.total > 0) {
-                        const pct = Math.floor((p.current / Math.max(1, p.total)) * 100);
+                    {
+                        const pct = p.total > 0 ? Math.floor((p.current / p.total) * 100)
+                                  : p.status === 'completed' ? 100 : 0;
                         _setBarSmooth(pct);
                         const txtEl = document.getElementById('progressText');
                         const txt = `Progress: ${p.current} / ${p.total}`;

@@ -1215,6 +1215,7 @@ def _batch_login_worker(accounts: list[dict], num_workers: int,
     _log(f"[BATCH] Complete: {success_count}/{len(results)} successful", 'success')
     _batch_login_progress.update({
         'running': False, 'status': 'completed',
+        'total': len(accounts),
         'success': success_count,
         'failed': len(results) - success_count,
         'pending': 0,

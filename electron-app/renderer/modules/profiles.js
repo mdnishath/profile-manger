@@ -1750,6 +1750,13 @@
 
         panel.style.display = 'block';
 
+        // Reset Stop button (in case it was changed to Close from a previous run)
+        const stopBtn = document.getElementById('opStopBtn');
+        if (stopBtn) {
+            stopBtn.innerHTML = '<i class="fas fa-stop"></i> Stop';
+            stopBtn.dataset.completed = '';
+        }
+
         // Timer update
         if (_opTimerInterval) clearInterval(_opTimerInterval);
         _opTimerInterval = setInterval(() => {
@@ -1842,7 +1849,23 @@
                 }
 
                 if (!isRunning) {
-                    _stopOpProgress(false);
+                    // Stop polling but keep panel visible with final state
+                    if (_opPoll) { clearInterval(_opPoll); _opPoll = null; }
+                    if (_opTimerInterval) { clearInterval(_opTimerInterval); _opTimerInterval = null; }
+
+                    // Update panel to show completion state
+                    if (sublabel) sublabel.textContent = 'Complete';
+                    if (bar) bar.style.width = '100%';
+                    if (pctEl) pctEl.textContent = '100%';
+
+                    // Switch Stop button to Close button
+                    const stopBtn = document.getElementById('opStopBtn');
+                    if (stopBtn) {
+                        stopBtn.innerHTML = '<i class="fas fa-times"></i> Close';
+                        stopBtn.dataset.completed = 'true';  // flag for click handler
+                    }
+
+                    // Show toast notifications
                     if (type === 'review' && reportPath) {
                         _showReviewReportReady(reportPath, done, total);
                     } else if (type === 'review') {
@@ -1853,6 +1876,7 @@
                         App.toast(`Re-Login complete: ${successCount} success, ${failedCount} failed`, 'success');
                         if (reportPath) _showReloginReportReady(reportPath, { success: successCount, failed: failedCount });
                     }
+                    loadProfiles();
                 }
             } catch (e) { /* ignore */ }
         }, 2000);
@@ -2272,7 +2296,20 @@
                 if (e.target === healthModal) closeHealthModal();
             });
         }
-        _btn('opStopBtn', () => _stopOpProgress(true));
+        _btn('opStopBtn', () => {
+            const btn = document.getElementById('opStopBtn');
+            if (btn && btn.dataset.completed === 'true') {
+                // Operation already finished — just close the panel
+                const panel = document.getElementById('opProgressPanel');
+                if (panel) panel.style.display = 'none';
+                _opType = null;
+                _opStartTime = null;
+                btn.dataset.completed = '';
+                if (typeof App !== 'undefined' && App.loadReports) setTimeout(() => App.loadReports(), 500);
+            } else {
+                _stopOpProgress(true);
+            }
+        });
         _btn('reviewReportDismissBtn', () => {
             const bar = document.getElementById('reviewReportBar');
             if (bar) bar.style.display = 'none';
