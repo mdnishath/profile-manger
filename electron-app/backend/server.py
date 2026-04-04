@@ -53,7 +53,14 @@ else:
     # Development: python server.py — CWD is typically electron-app/
     SCREENSHOTS_PATH = Path(__file__).parent.parent / 'screenshots'
 
-from prepare_excel_with_common_settings import prepare_excel_with_common_settings
+# Lazy-loaded: prepare_excel_with_common_settings (heavy pandas/openpyxl imports)
+_prepare_excel_fn = None
+def prepare_excel_with_common_settings(*args, **kwargs):
+    global _prepare_excel_fn
+    if _prepare_excel_fn is None:
+        from prepare_excel_with_common_settings import prepare_excel_with_common_settings as _fn
+        _prepare_excel_fn = _fn
+    return _prepare_excel_fn(*args, **kwargs)
 
 app = Flask(__name__)
 CORS(app, supports_credentials=False)
@@ -2207,6 +2214,20 @@ def profiles_delete_by_engine(engine):
         return jsonify({'success': True, 'deleted': count, 'message': f'Deleted {count} {label} profiles'})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@app.route('/api/profiles/delete-bulk', methods=['DELETE'])
+def profiles_delete_bulk():
+    """Delete multiple profiles by IDs."""
+    data = request.get_json() or {}
+    ids = data.get('ids', [])
+    if not ids:
+        return jsonify({'success': False, 'message': 'No profile IDs provided'}), 400
+    deleted = 0
+    for pid in ids:
+        if profile_manager.delete_profile(pid):
+            deleted += 1
+    return jsonify({'success': True, 'deleted': deleted, 'message': f'Deleted {deleted} profile(s)'})
 
 
 @app.route('/api/profiles/<profile_id>', methods=['DELETE'])

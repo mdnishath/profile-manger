@@ -838,14 +838,23 @@
         } catch (e) { App.toast('Delete error', 'error'); }
     }
 
-    async function deleteByEngine(engine) {
-        const label = 'NST';
-        const ok = await _asyncConfirm(`DELETE ALL ${label} PROFILES? This cannot be undone!`);
+    async function deleteSelectedProfiles() {
+        if (!_selectedIds.size) { App.toast('No profiles selected', 'warn'); return; }
+        const count = _selectedIds.size;
+        const ok = await _asyncConfirm(`DELETE ${count} SELECTED PROFILE${count > 1 ? 'S' : ''}? This cannot be undone!`);
         if (!ok) return;
         try {
-            const data = await _api(`/api/profiles/delete-by-engine/${engine}`, { method: 'DELETE' });
-            if (data.success) { App.toast(`Deleted ${data.deleted || 0} ${label} profiles`, 'success'); loadProfiles(); }
-            else App.toast(data.message || 'Delete failed', 'error');
+            const data = await _api('/api/profiles/delete-bulk', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids: [..._selectedIds] })
+            });
+            if (data.success) {
+                App.toast(`Deleted ${data.deleted || 0} profile(s)`, 'success');
+                _selectedIds.clear();
+                _updateBulkBar();
+                loadProfiles();
+            } else App.toast(data.message || 'Delete failed', 'error');
         } catch (e) { App.toast('Delete error', 'error'); }
     }
 
@@ -1249,7 +1258,12 @@
 
     function _refreshGroupsFromProfiles(allProfiles) {
         if (!allProfiles || !allProfiles.length) return;
-        const groups = [...new Set(allProfiles.map(p => (p.group || 'default').trim()).filter(Boolean))].sort();
+        const groupSet = new Set();
+        allProfiles.forEach(p => {
+            const gs = (p.groups && p.groups.length) ? p.groups : [(p.group || 'default')];
+            gs.forEach(g => { if (g && g.trim()) groupSet.add(g.trim()); });
+        });
+        const groups = [...groupSet].sort();
         const selectors = ['pmGroupFilter', 'appealGroupFilter', 'healthGroupFilter'];
         selectors.forEach(id => {
             const el = document.getElementById(id);
@@ -2043,6 +2057,7 @@
         _btn('pmBulkAddBtn', _bulkAddToGroup);
         _btn('pmBulkMoveBtn', _bulkMoveToGroup);
         _btn('pmBulkRemoveBtn', _bulkRemoveFromGroup);
+        _btn('pmBulkDeleteBtn', deleteSelectedProfiles);
         _btn('pmBulkSaveNoteBtn', _bulkSaveNoteOnly);
         _btn('pmBulkUpdateProxyBtn', _bulkUpdateProxy);
         _btn('pmBulkClearBtn', () => {
@@ -2084,7 +2099,6 @@
         });
 
         // Action buttons
-        _btn('profileDeleteNstBtn', () => deleteByEngine('nst'));
         _btn('profileCloseAllBtn', closeAllProfiles);
         _btn('profileCleanupBtn', cleanupOrphans);
         _btn('profileBatchLoginBtn', openBatchLoginModal);

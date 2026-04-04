@@ -221,11 +221,14 @@ def init(resources_path):
     if not _nst_api_key:
         _log("WARNING: NST API key not configured in config/browser.json", 'warning')
     else:
-        # Check NST connectivity
-        if _nst_check():
-            _log("NST Browser API connected successfully", 'success')
-        else:
-            _log("NST Browser not reachable — make sure NST client is running", 'warning')
+        # Check NST connectivity in background — don't block startup
+        import threading
+        def _bg_nst_check():
+            if _nst_check():
+                _log("NST Browser API connected successfully", 'success')
+            else:
+                _log("NST Browser not reachable — make sure NST client is running", 'warning')
+        threading.Thread(target=_bg_nst_check, daemon=True).start()
 
     _migrate_old_profiles()
     _log("NSTProfileManager initialized (NST Browser API mode)")

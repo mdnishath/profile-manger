@@ -54,8 +54,8 @@
     };
 
     App.startAggressiveDetection = async function () {
-        const MAX_ATTEMPTS = 30;
-        const RETRY_DELAY = 2000;
+        const MAX_ATTEMPTS = 60;
+        const RETRY_DELAY = 500;
         const statusText = document.getElementById('backendStatusText');
         const toggleBtn = document.getElementById('serverToggleBtn');
 

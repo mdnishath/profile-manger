@@ -254,9 +254,7 @@
         App.autoDetectServer();
 
         // Auto-detect running operations (restores progress panel after refresh)
-        setTimeout(() => {
-            if (App._autoDetectRunningOps) App._autoDetectRunningOps();
-        }, 2000);
+        if (App._autoDetectRunningOps) App._autoDetectRunningOps();
     }
 
     document.addEventListener('DOMContentLoaded', init);

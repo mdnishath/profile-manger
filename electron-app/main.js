@@ -50,39 +50,26 @@ function forceKillBackend() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function killZombieServers() {
-    // Method 1: PowerShell — most reliable on Windows
+    // Single fast netstat-based kill — no PowerShell overhead, no sleep
     try {
-        execSync(
-            'powershell -Command "Get-NetTCPConnection -LocalPort 5000 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }"',
-            { timeout: 10000 }
-        );
-        console.log('[Backend] PowerShell zombie kill executed for port 5000');
-    } catch(e) {
-        console.log('[Backend] PowerShell zombie kill: no processes found or command failed');
-    }
-
-    // Method 2: Fallback — kill any nexus-anty-engine.exe not spawned by us
-    try {
-        const myPid = pythonProcess ? pythonProcess.pid : -1;
         const out = execSync(
-            'powershell -Command "Get-Process -Name nexus-anty-engine -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Id"',
-            { encoding: 'utf8', timeout: 5000 }
+            'netstat -ano | findstr ":5000.*LISTENING"',
+            { encoding: 'utf8', timeout: 3000 }
         ).trim();
         if (out) {
+            const pids = new Set();
             for (const line of out.split('\n')) {
-                const pid = _safePid(line.trim());
-                if (pid && pid !== myPid) {
-                    console.log(`[Backend] Killing stale nexus-anty-engine.exe PID ${pid}`);
-                    try { execSync(`powershell -Command "Stop-Process -Id ${pid} -Force"`, { timeout: 3000 }); } catch(e2) {}
-                }
+                const pid = _safePid(line.trim().split(/\s+/).pop());
+                if (pid && pid > 4) pids.add(pid);  // skip System PIDs
+            }
+            for (const pid of pids) {
+                console.log(`[Backend] Killing zombie on port 5000: PID ${pid}`);
+                try { execSync(`taskkill /PID ${pid} /F`, { timeout: 3000 }); } catch(e) {}
             }
         }
     } catch(e) {
-        // No stale nexus-anty-engine.exe processes
+        // Port is free — good
     }
-
-    // Brief pause to let port release
-    try { execSync('powershell -Command "Start-Sleep -Milliseconds 1500"', { timeout: 5000 }); } catch(e) {}
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -100,27 +87,7 @@ function startBackendProcess() {
         // Kill any orphaned Python servers from a previous Electron session
         killZombieServers();
 
-        // Verify port 5000 is actually free now
-        try {
-            const portCheck = execSync(
-                'powershell -Command "(Get-NetTCPConnection -LocalPort 5000 -ErrorAction SilentlyContinue).OwningProcess"',
-                { encoding: 'utf8', timeout: 5000 }
-            ).trim();
-            if (portCheck) {
-                console.log(`[Backend] WARNING: port 5000 still occupied by PID(s): ${portCheck}. Killing...`);
-                for (const pidStr of portCheck.split('\n')) {
-                    const pid = _safePid(pidStr.trim());
-                    if (pid) {
-                        try { execSync(`powershell -Command "Stop-Process -Id ${pid} -Force"`, { timeout: 3000 }); } catch(e) {}
-                    }
-                }
-                // Extra wait after force kill
-                try { execSync('powershell -Command "Start-Sleep -Milliseconds 2000"', { timeout: 5000 }); } catch(e) {}
-            }
-        } catch(e) {
-            // Port is free — good
-            console.log('[Backend] Port 5000 is free');
-        }
+        // Port should be free after zombie kill — no extra check needed
 
         const isDev = !app.isPackaged;
 
@@ -271,12 +238,12 @@ function createWindow() {
     startBackendProcess()
         .then(async () => {
             console.log('[Backend] Auto-start complete, waiting for health endpoint...');
-            // Poll until Flask actually responds (not just process spawned)
+            // Poll until Flask actually responds — fast 500ms interval
             const http = require('http');
-            for (let i = 0; i < 60; i++) {
+            for (let i = 0; i < 120; i++) {
                 try {
                     const ok = await new Promise((resolve) => {
-                        const req = http.get('http://127.0.0.1:5000/api/health', { timeout: 2000 }, (res) => {
+                        const req = http.get('http://127.0.0.1:5000/api/health', { timeout: 1000 }, (res) => {
                             resolve(res.statusCode === 200);
                         });
                         req.on('error', () => resolve(false));
@@ -290,7 +257,7 @@ function createWindow() {
                         return;
                     }
                 } catch(e) {}
-                await new Promise(r => setTimeout(r, 1000));
+                await new Promise(r => setTimeout(r, 500));
             }
             console.log('[Backend] Health check never passed after 60s');
         })
