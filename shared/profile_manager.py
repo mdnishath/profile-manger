@@ -1966,7 +1966,8 @@ def run_operations_on_profiles(operations: str, num_workers: int = 5,
 
     _ops_status = {
         'running': True, 'progress': 'Starting...', 'done': 0,
-        'total': len(available), 'results': [], 'report_path': '',
+        'total': len(available), 'success': 0, 'failed': 0,
+        'results': [], 'report_path': '',
     }
 
     t = threading.Thread(
@@ -2067,11 +2068,13 @@ def _run_all_ops_worker(profiles: list, operations: str, params: dict, num_worke
     # Generate report
     report_path = _generate_ops_report(all_results, operations)
     success_count = sum(1 for r in all_results if r.get('success'))
+    fail_count = len(all_results) - success_count
     _log(f"[OPS] ✅ All complete: {success_count}/{len(all_results)} profiles", 'success')
 
-    _ops_status['running'] = False
-    _ops_status['results'] = all_results
-    _ops_status['report_path'] = report_path
+    _ops_status.update({
+        'running': False, 'results': all_results, 'report_path': report_path,
+        'success': success_count, 'failed': fail_count,
+    })
 
 
 async def _run_operations_for_profile(profile: dict, operations: str,

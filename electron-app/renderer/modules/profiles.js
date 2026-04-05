@@ -2043,9 +2043,9 @@
                     isRunning = !!st.running;
                     reportPath = st.report_path;
 
-                    if (st.results) {
-                        successCount = st.results.filter(r => r.status === 'success' || r.ok).length;
-                        failedCount  = st.results.filter(r => r.status === 'failed' || r.status === 'error' || r.ok === false).length;
+                    if (st.results && st.results.length) {
+                        successCount = st.results.filter(r => r.status === 'success' || r.ok || r.success === true).length;
+                        failedCount  = st.results.filter(r => r.status === 'failed' || r.status === 'error' || r.ok === false || r.success === false).length;
                     } else {
                         successCount = st.success || done;
                         failedCount  = st.failed || 0;
