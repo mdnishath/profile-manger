@@ -2496,6 +2496,32 @@ def profiles_ops_status():
     return jsonify(profile_manager.get_ops_status())
 
 
+@app.route('/api/profiles/run-ops', methods=['POST'])
+def profiles_run_ops():
+    """Run operations on selected profiles."""
+    data = request.get_json(force=True, silent=True) or {}
+    profile_ids = data.get('profile_ids', [])
+    operations = data.get('operations', '')
+    params = data.get('params', {})
+    num_workers = max(1, min(int(data.get('num_workers', 5)), 20))
+
+    if not profile_ids:
+        return jsonify({'success': False, 'error': 'No profiles selected'})
+    if not operations:
+        return jsonify({'success': False, 'error': 'No operations selected'})
+
+    try:
+        result = profile_manager.run_operations_on_profiles(
+            operations=operations,
+            num_workers=num_workers,
+            params=params,
+            profile_ids=profile_ids,
+        )
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @app.route('/api/profiles/run-health', methods=['POST'])
 def profiles_run_health():
     """Start health activity on selected profiles with specific activities."""

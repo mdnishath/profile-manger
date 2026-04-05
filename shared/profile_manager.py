@@ -1922,8 +1922,8 @@ _ops_status: dict = {}
 
 
 def run_operations_on_profiles(operations: str, num_workers: int = 5,
-                               params: dict = None) -> dict:
-    """Run Step 1/2 operations on all profiles. Returns immediately."""
+                               params: dict = None, profile_ids: list = None) -> dict:
+    """Run Step 1/2 operations on profiles. If profile_ids provided, only those profiles. Returns immediately."""
     global _ops_status
     if _ops_status.get('running'):
         return {'success': False, 'error': 'Operations already running'}
@@ -1931,6 +1931,13 @@ def run_operations_on_profiles(operations: str, num_workers: int = 5,
     profiles = _read_profiles()
     if not profiles:
         return {'success': False, 'error': 'No profiles found'}
+
+    # Filter by selected profile IDs if provided
+    if profile_ids:
+        id_set = set(profile_ids)
+        profiles = [p for p in profiles if p['id'] in id_set]
+        if not profiles:
+            return {'success': False, 'error': 'None of the selected profiles found'}
 
     available = []
     for p in profiles:
@@ -1944,6 +1951,17 @@ def run_operations_on_profiles(operations: str, num_workers: int = 5,
         return {'success': False, 'error': 'All profiles have browsers open'}
 
     num_workers = max(1, min(num_workers, 20))
+
+    # Distribute name list to profiles (round-robin) if provided
+    if params and params.get('name_list'):
+        name_lines = [ln.strip() for ln in params['name_list'].strip().split('\n') if ln.strip()]
+        if name_lines:
+            for i, p in enumerate(available):
+                name = name_lines[i % len(name_lines)]
+                parts = name.split(None, 1)
+                p['_op_first_name'] = parts[0] if parts else ''
+                p['_op_last_name'] = parts[1] if len(parts) > 1 else ''
+
     _log(f"[OPS] Starting operations: {len(available)} profiles, {num_workers} workers, ops={operations}")
 
     _ops_status = {
@@ -2077,8 +2095,8 @@ async def _run_operations_for_profile(profile: dict, operations: str,
         'New 2FA Phone': params.get('recovery_phone', ''),
         'TOTP Secret': profile.get('totp_secret', ''),
         'Name Country': params.get('name_country', 'US'),
-        'First Name': params.get('first_name', ''),
-        'Last Name': params.get('last_name', ''),
+        'First Name': profile.get('_op_first_name', params.get('first_name', '')),
+        'Last Name': profile.get('_op_last_name', params.get('last_name', '')),
     }
     # Fill backup codes
     for i, code in enumerate(profile.get('backup_codes', [])[:10]):

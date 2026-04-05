@@ -2613,10 +2613,11 @@ def get_batch_login_progress() -> dict:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 def run_operations_on_profiles(operations: str, num_workers: int = 5,
-                               params: dict | None = None) -> dict:
+                               params: dict | None = None,
+                               profile_ids: list = None) -> dict:
     from shared import profile_manager as _old_pm
     _sync_state_to_old(_old_pm)
-    return _old_pm.run_operations_on_profiles(operations, num_workers, params)
+    return _old_pm.run_operations_on_profiles(operations, num_workers, params, profile_ids=profile_ids)
 
 
 def get_ops_status() -> dict:

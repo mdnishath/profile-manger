@@ -990,8 +990,233 @@
         } catch (e) { App.toast('Batch login error: ' + e.message, 'error'); }
     }
 
-    async function startRunOps() {
-        App.toast('Run operations — use the separate process bot', 'info');
+    // ══════════════════════════════════════════════════════════════════════
+    // RUN OPS MODAL
+    // ══════════════════════════════════════════════════════════════════════
+    let _runOpsProfiles = [];
+    const _runOpsChecked = new Set();
+    let _runOpsSearch = '';
+    let _runOpsPage = 1;
+    let _runOpsGroupFilter = '';
+    const _RUNOPS_PAGE_SIZE = 15;
+
+    function openRunOpsModal() {
+        const modal = document.getElementById('runOpsModal');
+        if (!modal) return;
+        // Pre-select from bulk selection
+        _runOpsChecked.clear();
+        _selectedIds.forEach(id => _runOpsChecked.add(id));
+        // Load profiles
+        _api('/api/profiles?per_page=9999').then(data => {
+            _runOpsProfiles = data.profiles || [];
+            // If no bulk selection, select all
+            if (!_runOpsChecked.size) _runOpsProfiles.forEach(p => _runOpsChecked.add(p.id));
+            _runOpsPage = 1;
+            _renderRunOpsProfiles();
+            _updateRunOpsCount();
+            // Populate group filter
+            const gf = document.getElementById('runOpsGroupFilter');
+            if (gf) {
+                const groups = [...new Set(_runOpsProfiles.flatMap(p => (p.groups && p.groups.length) ? p.groups : [p.group || 'default']))].sort();
+                gf.innerHTML = '<option value="">All Groups</option>' + groups.map(g => `<option value="${g}">${g}</option>`).join('');
+            }
+        });
+        // Reset ops checkboxes
+        modal.querySelectorAll('.runops-op').forEach(cb => { cb.checked = false; });
+        _updateRunOpsParams();
+        modal.style.display = 'flex';
+    }
+
+    function _closeRunOpsModal() {
+        const modal = document.getElementById('runOpsModal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    function _filteredRunOpsProfiles() {
+        let list = _runOpsProfiles;
+        const q = _runOpsSearch.trim().toLowerCase();
+        if (q) list = list.filter(p => (p.email || '').toLowerCase().includes(q) || (p.name || '').toLowerCase().includes(q));
+        if (_runOpsGroupFilter) list = list.filter(p => {
+            const gs = (p.groups && p.groups.length) ? p.groups : [p.group || 'default'];
+            return gs.some(g => g.toLowerCase() === _runOpsGroupFilter.toLowerCase());
+        });
+        return list;
+    }
+
+    function _renderRunOpsProfiles() {
+        const container = document.getElementById('runOpsProfileList');
+        if (!container) return;
+        const filtered = _filteredRunOpsProfiles();
+        const totalPages = Math.max(1, Math.ceil(filtered.length / _RUNOPS_PAGE_SIZE));
+        _runOpsPage = Math.min(_runOpsPage, totalPages);
+        const start = (_runOpsPage - 1) * _RUNOPS_PAGE_SIZE;
+        const page = filtered.slice(start, start + _RUNOPS_PAGE_SIZE);
+
+        let html = page.map(p => {
+            const checked = _runOpsChecked.has(p.id) ? 'checked' : '';
+            const statusCls = p.status === 'logged_in' ? 'color:#22c55e' : p.status === 'login_failed' ? 'color:#ef4444' : 'color:#64748b';
+            return `<label class="runops-profile-row">
+                <input type="checkbox" data-id="${p.id}" ${checked}>
+                <div style="flex:1;min-width:0;">
+                    <div style="font-size:12px;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${_esc(p.name || 'Unnamed')}</div>
+                    <div style="font-size:10px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${_esc(p.email || '')}</div>
+                </div>
+                <span style="font-size:10px;${statusCls};">${p.status === 'logged_in' ? '✓' : p.status === 'login_failed' ? '✗' : '—'}</span>
+            </label>`;
+        }).join('');
+
+        // Pagination
+        if (totalPages > 1) {
+            html += '<div class="modal-pg-bar">';
+            if (_runOpsPage > 1) html += `<button class="modal-pg-btn" data-pg="${_runOpsPage - 1}">‹</button>`;
+            for (let i = 1; i <= totalPages; i++) {
+                html += `<button class="modal-pg-btn ${i === _runOpsPage ? 'active' : ''}" data-pg="${i}">${i}</button>`;
+            }
+            if (_runOpsPage < totalPages) html += `<button class="modal-pg-btn" data-pg="${_runOpsPage + 1}">›</button>`;
+            html += '</div>';
+        }
+        container.innerHTML = html;
+
+        // Bind checkbox events
+        container.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+            cb.addEventListener('change', () => {
+                if (cb.checked) _runOpsChecked.add(cb.dataset.id);
+                else _runOpsChecked.delete(cb.dataset.id);
+                _updateRunOpsCount();
+            });
+        });
+        // Bind pagination
+        container.querySelectorAll('.modal-pg-btn').forEach(btn => {
+            btn.addEventListener('click', () => { _runOpsPage = parseInt(btn.dataset.pg); _renderRunOpsProfiles(); });
+        });
+    }
+
+    function _updateRunOpsCount() {
+        const el = document.getElementById('runOpsSelectedCount');
+        if (el) el.textContent = _runOpsChecked.size;
+    }
+
+    function _updateRunOpsParams() {
+        const ops = new Set();
+        document.querySelectorAll('.runops-op:checked').forEach(cb => ops.add(cb.value));
+
+        const show = (id, visible) => { const el = document.getElementById(id); if (el) el.style.display = visible ? 'block' : 'none'; };
+        show('runOpsParamPassword', ops.has('1'));
+        show('runOpsParamRecoveryPhone', ops.has('2a') || ops.has('6a'));
+        show('runOpsParamRecoveryEmail', ops.has('3a'));
+        show('runOpsParam2FAPhone', ops.has('6a'));
+        show('runOpsParamNames', ops.has('8'));
+        show('runOpsNoParams', !ops.has('1') && !ops.has('2a') && !ops.has('3a') && !ops.has('6a') && !ops.has('8'));
+    }
+
+    function _setupRunOpsModal() {
+        // Close buttons
+        _btn('runOpsModalClose', _closeRunOpsModal);
+        _btn('runOpsModalCancelBtn', _closeRunOpsModal);
+
+        // Step tabs
+        document.querySelectorAll('.runops-step-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.runops-step-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                document.querySelectorAll('.runops-step-panel').forEach(p => p.style.display = 'none');
+                const panel = document.getElementById('runOpsStep' + tab.dataset.step);
+                if (panel) panel.style.display = 'block';
+            });
+        });
+
+        // Op checkboxes → toggle param fields
+        document.querySelectorAll('.runops-op').forEach(cb => {
+            cb.addEventListener('change', _updateRunOpsParams);
+        });
+
+        // Search
+        const searchEl = document.getElementById('runOpsSearchInput');
+        if (searchEl) searchEl.addEventListener('input', () => {
+            _runOpsSearch = searchEl.value; _runOpsPage = 1; _renderRunOpsProfiles();
+        });
+
+        // Group filter
+        const gfEl = document.getElementById('runOpsGroupFilter');
+        if (gfEl) gfEl.addEventListener('change', () => {
+            _runOpsGroupFilter = gfEl.value; _runOpsPage = 1; _renderRunOpsProfiles();
+        });
+
+        // Select All / None
+        _btn('runOpsSelectAll', () => {
+            _filteredRunOpsProfiles().forEach(p => _runOpsChecked.add(p.id));
+            _renderRunOpsProfiles(); _updateRunOpsCount();
+        });
+        _btn('runOpsDeselectAll', () => {
+            _runOpsChecked.clear(); _renderRunOpsProfiles(); _updateRunOpsCount();
+        });
+
+        // Load names from file
+        _btn('runOpsLoadNamesBtn', () => {
+            document.getElementById('runOpsNameFileInput')?.click();
+        });
+        const nameFileInput = document.getElementById('runOpsNameFileInput');
+        if (nameFileInput) nameFileInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            try {
+                const text = await file.text();
+                const textarea = document.getElementById('runOpsNameList');
+                if (textarea) textarea.value = text.trim();
+                App.toast(`Loaded ${text.trim().split('\n').length} names from file`, 'success');
+            } catch (err) { App.toast('Failed to read file', 'error'); }
+            nameFileInput.value = '';
+        });
+
+        // Start button
+        _btn('runOpsModalStartBtn', _submitRunOps);
+    }
+
+    async function _submitRunOps() {
+        if (!_runOpsChecked.size) { App.toast('No profiles selected', 'warn'); return; }
+
+        // Collect selected operations
+        const ops = [];
+        document.querySelectorAll('.runops-op:checked').forEach(cb => ops.push(cb.value));
+        if (!ops.length) { App.toast('No operations selected', 'warn'); return; }
+
+        const workers = parseInt(document.getElementById('runOpsWorkers')?.value || '5') || 5;
+        const stagger = parseInt(document.getElementById('runOpsStagger')?.value || '3') || 3;
+
+        // Collect params
+        const params = {};
+        if (ops.includes('1')) params.new_password = _val('runOpsNewPassword') || '';
+        if (ops.includes('2a') || ops.includes('6a')) params.recovery_phone = _val('runOpsRecoveryPhone') || '';
+        if (ops.includes('3a')) params.recovery_email = _val('runOpsRecoveryEmail') || '';
+        if (ops.includes('6a')) params.twofa_phone = _val('runOps2FAPhone') || '';
+        if (ops.includes('8')) {
+            params.name_list = (_val('runOpsNameList') || '').trim();
+            params.name_country = document.getElementById('runOpsNameCountry')?.value || 'US';
+        }
+
+        // Validate required params
+        if (ops.includes('1') && !params.new_password) { App.toast('New password is required for Change Password', 'warn'); return; }
+
+        try {
+            const data = await _api('/api/profiles/run-ops', {
+                method: 'POST',
+                body: JSON.stringify({
+                    profile_ids: [..._runOpsChecked],
+                    operations: ops.join(','),
+                    params,
+                    num_workers: workers,
+                    stagger_delay: stagger,
+                })
+            });
+            if (data.success) {
+                _closeRunOpsModal();
+                App.toast(`Operations started on ${data.total || _runOpsChecked.size} profiles`, 'success');
+                _startOpProgress('run-ops');
+                _startStatusPolling();
+            } else {
+                App.toast(data.error || data.message || 'Failed to start operations', 'error');
+            }
+        } catch (e) { App.toast('Error: ' + e.message, 'error'); }
     }
 
     // ══════════════════════════════════════════════════════════════════════
@@ -1654,6 +1879,7 @@
         'health':      { icon: 'fa-heartbeat',    label: 'Health Activity', successLbl: 'Done',       failLbl: 'Failed',  pendingLbl: 'Remaining' },
         'setai':       { icon: 'fa-robot',        label: 'SetAI Hook',     successLbl: 'Hooked',      failLbl: 'Failed',  pendingLbl: 'Remaining' },
         'delete':      { icon: 'fa-trash',        label: 'Delete Profiles', successLbl: 'Deleted',    failLbl: 'Failed',  pendingLbl: 'Remaining' },
+        'run-ops':     { icon: 'fa-cogs',         label: 'Run Operations',  successLbl: 'Done',       failLbl: 'Failed',  pendingLbl: 'Remaining' },
     };
 
     // Auto-detect running operations on page load / refresh
@@ -1662,6 +1888,7 @@
         try {
             // Check all operation status endpoints
             const checks = [
+                { type: 'run-ops', url: '/api/profiles/ops-status' },
                 { type: 'appeal', url: '/api/profiles/appeal-status' },
                 { type: 'health', url: '/api/profiles/health-status' },
                 { type: 'review', url: '/api/profiles/review-status' },
@@ -1805,7 +2032,8 @@
                     }
                 } else {
                     let endpoint;
-                    if (type === 'appeal') endpoint = '/api/profiles/appeal-status';
+                    if (type === 'run-ops') endpoint = '/api/profiles/ops-status';
+                    else if (type === 'appeal') endpoint = '/api/profiles/appeal-status';
                     else if (type === 'review') endpoint = '/api/profiles/review-status';
                     else endpoint = '/api/profiles/health-status';
 
@@ -1892,6 +2120,8 @@
                         App.toast(`Write Review complete: ${done}/${total} done`, 'success');
                     } else if (type === 'delete') {
                         App.toast(`Delete complete: ${successCount} deleted, ${failedCount} failed`, 'success');
+                    } else if (type === 'run-ops') {
+                        App.toast(`Operations complete: ${successCount} done, ${failedCount} failed`, 'success');
                     } else if (type === 'batch-login') {
                         App.toast(`Batch Login complete: ${successCount} logged in, ${failedCount} failed`, 'success');
                     } else if (type === 'relogin') {
@@ -2148,7 +2378,8 @@
         _btn('profileCloseAllBtn', closeAllProfiles);
         _btn('profileCleanupBtn', cleanupOrphans);
         _btn('profileBatchLoginBtn', openBatchLoginModal);
-        _btn('profileRunOpsBtn', startRunOps);
+        _btn('profileRunOpsBtn', openRunOpsModal);
+        _setupRunOpsModal();
         _btn('profileDoAllAppealBtn', openAppealModal);
         _btn('appealModalClose', closeAppealModal);
         _btn('appealModalCancelBtn', closeAppealModal);
