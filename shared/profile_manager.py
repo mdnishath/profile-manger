@@ -1810,6 +1810,7 @@ async def _run_write_review_for_profile(profile: dict, review_data: dict, worker
     email = profile.get('email', '')
     engine = profile.get('engine', 'nexus')
     gmb_url = review_data.get('gmb_url', '')
+    review_url = review_data.get('review_url', '')
     review_text = review_data.get('review_text', '')
     stars = review_data.get('stars', 5)
 
@@ -1840,7 +1841,8 @@ async def _run_write_review_for_profile(profile: dict, review_data: dict, worker
                 result = await write_review(page, worker_id,
                                             place_url=gmb_url,
                                             review_text=review_text,
-                                            stars=stars)
+                                            stars=stars,
+                                            review_url=review_url)
                 # Disconnect but DO NOT stop browser — session stays alive
                 try: await browser_obj.close()
                 except Exception: pass
@@ -1864,7 +1866,8 @@ async def _run_write_review_for_profile(profile: dict, review_data: dict, worker
                     result = await write_review(page, worker_id,
                                                 place_url=gmb_url,
                                                 review_text=review_text,
-                                                stars=stars)
+                                                stars=stars,
+                                                review_url=review_url)
                     # Close context without logout
                     try: await context.close()
                     except Exception: pass

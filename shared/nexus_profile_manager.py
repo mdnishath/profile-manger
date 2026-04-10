@@ -3327,28 +3327,39 @@ def do_write_review_profiles(
     except Exception as e:
         return {'success': False, 'error': f'Cannot read Excel: {e}'}
 
-    required_cols = {'Email', 'GMB URL'}
-    missing = required_cols - set(df.columns)
-    if missing:
-        return {'success': False, 'error': f'Missing columns: {", ".join(missing)}'}
+    # Need Email + at least one of Review URL or GMB URL
+    cols_set = set(df.columns)
+    if 'Email' not in cols_set:
+        return {'success': False, 'error': 'Missing column: Email'}
+    has_review_url_col = 'Review URL' in cols_set
+    has_gmb_url_col = 'GMB URL' in cols_set
+    if not has_review_url_col and not has_gmb_url_col:
+        return {'success': False, 'error': 'Missing column: need "Review URL" or "GMB URL"'}
 
     # Build email → review_data map
     review_map: dict = {}
     for _, row in df.iterrows():
         email = str(row.get('Email', '')).strip().lower()
-        gmb_url = str(row.get('GMB URL', '')).strip()
+        gmb_url = str(row.get('GMB URL', '')).strip() if has_gmb_url_col else ''
+        review_url = str(row.get('Review URL', '')).strip() if has_review_url_col else ''
         review_text = str(row.get('Review Text', '')).strip()
         review_text = '' if review_text.lower() == 'nan' else review_text
+        if review_url.lower() == 'nan':
+            review_url = ''
+        if gmb_url.lower() == 'nan':
+            gmb_url = ''
         try:
             stars = int(float(str(row.get('Review Stars', 5))))
         except Exception:
             stars = 5
         stars = max(1, min(5, stars))
-        if email and gmb_url and email != 'nan' and gmb_url != 'nan':
-            review_map[email] = {'gmb_url': gmb_url, 'review_text': review_text, 'stars': stars}
+        # Valid if we have email + at least one URL
+        if email and email != 'nan' and (review_url or gmb_url):
+            review_map[email] = {'gmb_url': gmb_url, 'review_url': review_url,
+                                 'review_text': review_text, 'stars': stars}
 
     if not review_map:
-        return {'success': False, 'error': 'No valid rows with Email + GMB URL found in Excel'}
+        return {'success': False, 'error': 'No valid rows with Email + Review URL/GMB URL found in Excel'}
 
     # Match against THIS module's profiles (correct path: MailNexusPro)
     all_profiles = _read_profiles()

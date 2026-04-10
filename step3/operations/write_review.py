@@ -579,17 +579,25 @@ async def _click_post(ctx, worker_id):
 
 
 async def write_review(page, worker_id, place_url: str,
-                       review_text: str = '', stars: int = 5) -> dict:
+                       review_text: str = '', stars: int = 5,
+                       review_url: str = '') -> dict:
     """
     Post a new Maps review and return a full status report dict.
+    If review_url is provided, navigate directly to it (opens review popup
+    without needing to click "Write a review" button — much faster).
+    Falls back to the old place_url flow when review_url is empty.
     """
     stars = max(1, min(5, int(stars or 5)))
+    use_direct_url = bool(review_url and str(review_url).strip() and str(review_url).strip().lower() != 'nan')
 
     result = _make_result()
 
     try:
         _log(worker_id, f"[WRITE_REVIEW] Starting {stars}-star review...")
-        _log(worker_id, f"[WRITE_REVIEW] URL: {str(place_url)[:100]}")
+        if use_direct_url:
+            _log(worker_id, f"[WRITE_REVIEW] Using direct Review URL: {str(review_url)[:100]}")
+        else:
+            _log(worker_id, f"[WRITE_REVIEW] Using GMB URL: {str(place_url)[:100]}")
 
         # ── 0. Go to contrib page first (establish Maps session) ────────────
         _log(worker_id, '[WRITE_REVIEW] Establishing Maps session via contrib page...')
@@ -605,163 +613,171 @@ async def write_review(page, worker_id, place_url: str,
             if _star_retry > 0:
                 _log(worker_id, f'[WRITE_REVIEW] === STAR RETRY {_star_retry}/{_star_retry_max-1}: reloading page ===')
 
-            # ── 1. Navigate to place URL ─────────────────────────────────────
-            await robust_goto(page, str(place_url), worker_id=worker_id, timeout=60000)
+            if use_direct_url:
+                # ── DIRECT REVIEW URL FLOW (skip place nav + Write a review click) ──
+                _log(worker_id, '[WRITE_REVIEW] Navigating to direct Review URL...')
+                await robust_goto(page, str(review_url).strip(), worker_id=worker_id, timeout=60000)
+                await asyncio.sleep(3)
+                _log(worker_id, '[WRITE_REVIEW] Review URL loaded — waiting for popup...')
+            else:
+                # ── OLD FLOW: place URL → Reviews tab → Write a review button ───
+                # ── 1. Navigate to place URL ─────────────────────────────────────
+                await robust_goto(page, str(place_url), worker_id=worker_id, timeout=60000)
 
-            # ── 1b. Click "Reviews" tab ──────────────────────────────────────
-            reviews_tab_clicked = False
-            for _tab_try in range(3):
-                for sel in [
-                    'button[role="tab"][data-tab-index="1"]',
-                    'button[role="tab"].hh2c6[data-tab-index="1"]',
-                    'button[role="tab"][aria-label*="Reviews" i]',
-                    'button[role="tab"][aria-label*="review" i]',
-                    'button[role="tab"][aria-label*="avis" i]',
-                ]:
-                    try:
-                        el = page.locator(sel).first
-                        if await el.count() > 0:
-                            try:
-                                await el.scroll_into_view_if_needed(timeout=3000)
-                            except Exception:
-                                pass
-                            if await el.is_visible():
-                                await el.click()
-                                _log(worker_id, f'[WRITE_REVIEW] Reviews tab clicked via: {sel}')
-                                reviews_tab_clicked = True
-                                break
-                    except Exception:
-                        continue
-                if reviews_tab_clicked:
-                    break
+                # ── 1b. Click "Reviews" tab ──────────────────────────────────────
+                reviews_tab_clicked = False
+                for _tab_try in range(3):
+                    for sel in [
+                        'button[role="tab"][data-tab-index="1"]',
+                        'button[role="tab"].hh2c6[data-tab-index="1"]',
+                        'button[role="tab"][aria-label*="Reviews" i]',
+                        'button[role="tab"][aria-label*="review" i]',
+                        'button[role="tab"][aria-label*="avis" i]',
+                    ]:
+                        try:
+                            el = page.locator(sel).first
+                            if await el.count() > 0:
+                                try:
+                                    await el.scroll_into_view_if_needed(timeout=3000)
+                                except Exception:
+                                    pass
+                                if await el.is_visible():
+                                    await el.click()
+                                    _log(worker_id, f'[WRITE_REVIEW] Reviews tab clicked via: {sel}')
+                                    reviews_tab_clicked = True
+                                    break
+                        except Exception:
+                            continue
+                    if reviews_tab_clicked:
+                        break
+                    if not reviews_tab_clicked:
+                        try:
+                            tabs = page.locator('button[role="tab"].hh2c6')
+                            cnt = await tabs.count()
+                            for i in range(cnt):
+                                t = tabs.nth(i)
+                                label = await t.inner_text()
+                                if 'review' in label.lower() or 'avis' in label.lower():
+                                    await t.click()
+                                    _log(worker_id, f'[WRITE_REVIEW] Reviews tab clicked via text: {label}')
+                                    reviews_tab_clicked = True
+                                    break
+                        except Exception:
+                            pass
+                    if reviews_tab_clicked:
+                        break
+                    _log(worker_id, f'[WRITE_REVIEW] Reviews tab attempt {_tab_try+1}/3 — waiting 2s...')
+                    await asyncio.sleep(2)
+
                 if not reviews_tab_clicked:
-                    try:
-                        tabs = page.locator('button[role="tab"].hh2c6')
-                        cnt = await tabs.count()
-                        for i in range(cnt):
-                            t = tabs.nth(i)
-                            label = await t.inner_text()
-                            if 'review' in label.lower() or 'avis' in label.lower():
-                                await t.click()
-                                _log(worker_id, f'[WRITE_REVIEW] Reviews tab clicked via text: {label}')
-                                reviews_tab_clicked = True
-                                break
-                    except Exception:
-                        pass
-                if reviews_tab_clicked:
-                    break
-                _log(worker_id, f'[WRITE_REVIEW] Reviews tab attempt {_tab_try+1}/3 — waiting 2s...')
+                    _log(worker_id, '[WRITE_REVIEW] WARNING: Reviews tab not found — trying scroll instead')
+
                 await asyncio.sleep(2)
 
-            if not reviews_tab_clicked:
-                _log(worker_id, '[WRITE_REVIEW] WARNING: Reviews tab not found — trying scroll instead')
-
-            await asyncio.sleep(2)
-
-            # ── 1c. Scroll Maps side panel ───────────────────────────────────
-            try:
-                await page.evaluate('''() => {
-                    const panels = document.querySelectorAll('div.m6QErb.DxyBCb');
-                    for (const p of panels) { p.scrollTop = p.scrollHeight * 0.5; }
-                }''')
-            except Exception:
-                pass
-            await asyncio.sleep(2)
-
-            # ── 2. Click "Write a review" button ─────────────────────────────
-            write_clicked = False
-            _WRITE_REVIEW_SELECTORS = [
-                'button.S9kvJb',
-                'button[data-value="Write a review"]',
-                'button[aria-label="Write a review"]',
-                'button[aria-label*="Write a review"]',
-                'button[aria-label*="review" i][aria-label*="write" i]',
-                'button[aria-label*="avis" i]',
-                'button[aria-label*="Rezension" i]',
-                'button[aria-label*="reseña" i]',
-                'button[aria-label*="recensione" i]',
-            ]
-
-            for _wr_attempt in range(3):
-                for sel in _WRITE_REVIEW_SELECTORS:
-                    try:
-                        el = page.locator(sel).first
-                        if await el.count() > 0:
-                            try:
-                                await el.scroll_into_view_if_needed(timeout=3000)
-                            except Exception:
-                                pass
-                            await asyncio.sleep(0.5)
-                            if await el.is_visible():
-                                await el.click()
-                                _log(worker_id, f'[WRITE_REVIEW] Clicked via CSS: {sel}')
-                                write_clicked = True
-                                break
-                    except Exception:
-                        continue
-                if write_clicked:
-                    break
-                if not write_clicked:
-                    try:
-                        js_found = await page.evaluate('''() => {
-                            const fb = document.querySelector('button.S9kvJb');
-                            if (fb) { fb.scrollIntoView({block:'center'}); fb.click(); return 'S9kvJb class'; }
-                            const btns = [...document.querySelectorAll('button')];
-                            const keywords = ['write a review','donner un avis','rédiger un avis',
-                                'laisser un avis','bewertung schreiben','escribir una reseña',
-                                'scrivi una recensione','escrever um comentário','leave a review'];
-                            for (const btn of btns) {
-                                const label = (btn.getAttribute('aria-label')||'').toLowerCase();
-                                const text = (btn.textContent||'').toLowerCase().trim();
-                                const dataVal = (btn.getAttribute('data-value')||'').toLowerCase();
-                                for (const kw of keywords) {
-                                    if (label.includes(kw)||text.includes(kw)||dataVal.includes(kw)) {
-                                        btn.scrollIntoView({block:'center'}); btn.click(); return kw;
-                                    }
-                                }
-                            }
-                            return null;
-                        }''')
-                        if js_found:
-                            _log(worker_id, f'[WRITE_REVIEW] Clicked via JS: {js_found}')
-                            write_clicked = True
-                    except Exception as js_err:
-                        _log(worker_id, f'[WRITE_REVIEW] JS button search error: {js_err}')
-                if write_clicked:
-                    break
-                _log(worker_id, f'[WRITE_REVIEW] Write a review attempt {_wr_attempt+1}/3 — scrolling panel + waiting 3s...')
+                # ── 1c. Scroll Maps side panel ───────────────────────────────────
                 try:
                     await page.evaluate('''() => {
                         const panels = document.querySelectorAll('div.m6QErb.DxyBCb');
-                        for (const p of panels) { p.scrollTop += 600; }
+                        for (const p of panels) { p.scrollTop = p.scrollHeight * 0.5; }
                     }''')
                 except Exception:
                     pass
-                await asyncio.sleep(3)
+                await asyncio.sleep(2)
 
-            if not write_clicked:
-                try:
-                    debug_info = await page.evaluate('''() => {
-                        const btns = [...document.querySelectorAll('button')];
-                        return btns.slice(0,30).map(b => ({
-                            label: (b.getAttribute('aria-label')||'').slice(0,60),
-                            text: (b.textContent||'').trim().slice(0,40),
-                            visible: b.offsetParent !== null,
-                            cls: b.className.slice(0,40),
-                        }));
-                    }''')
-                    _log(worker_id, f'[WRITE_REVIEW] DEBUG buttons: {debug_info}')
-                except Exception:
-                    pass
-                _log(worker_id, '[WRITE_REVIEW] Write a review button not found')
-                if _star_retry < _star_retry_max - 1:
-                    _log(worker_id, '[WRITE_REVIEW] Will reload and retry...')
-                    continue
-                result['summary'] = 'Write a review button not found'
-                return result
+                # ── 2. Click "Write a review" button ─────────────────────────────
+                write_clicked = False
+                _WRITE_REVIEW_SELECTORS = [
+                    'button.S9kvJb',
+                    'button[data-value="Write a review"]',
+                    'button[aria-label="Write a review"]',
+                    'button[aria-label*="Write a review"]',
+                    'button[aria-label*="review" i][aria-label*="write" i]',
+                    'button[aria-label*="avis" i]',
+                    'button[aria-label*="Rezension" i]',
+                    'button[aria-label*="reseña" i]',
+                    'button[aria-label*="recensione" i]',
+                ]
 
-            await asyncio.sleep(5)
-            _log(worker_id, '[WRITE_REVIEW] Clicked Write a review - waiting for popup...')
+                for _wr_attempt in range(3):
+                    for sel in _WRITE_REVIEW_SELECTORS:
+                        try:
+                            el = page.locator(sel).first
+                            if await el.count() > 0:
+                                try:
+                                    await el.scroll_into_view_if_needed(timeout=3000)
+                                except Exception:
+                                    pass
+                                await asyncio.sleep(0.5)
+                                if await el.is_visible():
+                                    await el.click()
+                                    _log(worker_id, f'[WRITE_REVIEW] Clicked via CSS: {sel}')
+                                    write_clicked = True
+                                    break
+                        except Exception:
+                            continue
+                    if write_clicked:
+                        break
+                    if not write_clicked:
+                        try:
+                            js_found = await page.evaluate('''() => {
+                                const fb = document.querySelector('button.S9kvJb');
+                                if (fb) { fb.scrollIntoView({block:'center'}); fb.click(); return 'S9kvJb class'; }
+                                const btns = [...document.querySelectorAll('button')];
+                                const keywords = ['write a review','donner un avis','rédiger un avis',
+                                    'laisser un avis','bewertung schreiben','escribir una reseña',
+                                    'scrivi una recensione','escrever um comentário','leave a review'];
+                                for (const btn of btns) {
+                                    const label = (btn.getAttribute('aria-label')||'').toLowerCase();
+                                    const text = (btn.textContent||'').toLowerCase().trim();
+                                    const dataVal = (btn.getAttribute('data-value')||'').toLowerCase();
+                                    for (const kw of keywords) {
+                                        if (label.includes(kw)||text.includes(kw)||dataVal.includes(kw)) {
+                                            btn.scrollIntoView({block:'center'}); btn.click(); return kw;
+                                        }
+                                    }
+                                }
+                                return null;
+                            }''')
+                            if js_found:
+                                _log(worker_id, f'[WRITE_REVIEW] Clicked via JS: {js_found}')
+                                write_clicked = True
+                        except Exception as js_err:
+                            _log(worker_id, f'[WRITE_REVIEW] JS button search error: {js_err}')
+                    if write_clicked:
+                        break
+                    _log(worker_id, f'[WRITE_REVIEW] Write a review attempt {_wr_attempt+1}/3 — scrolling panel + waiting 3s...')
+                    try:
+                        await page.evaluate('''() => {
+                            const panels = document.querySelectorAll('div.m6QErb.DxyBCb');
+                            for (const p of panels) { p.scrollTop += 600; }
+                        }''')
+                    except Exception:
+                        pass
+                    await asyncio.sleep(3)
+
+                if not write_clicked:
+                    try:
+                        debug_info = await page.evaluate('''() => {
+                            const btns = [...document.querySelectorAll('button')];
+                            return btns.slice(0,30).map(b => ({
+                                label: (b.getAttribute('aria-label')||'').slice(0,60),
+                                text: (b.textContent||'').trim().slice(0,40),
+                                visible: b.offsetParent !== null,
+                                cls: b.className.slice(0,40),
+                            }));
+                        }''')
+                        _log(worker_id, f'[WRITE_REVIEW] DEBUG buttons: {debug_info}')
+                    except Exception:
+                        pass
+                    _log(worker_id, '[WRITE_REVIEW] Write a review button not found')
+                    if _star_retry < _star_retry_max - 1:
+                        _log(worker_id, '[WRITE_REVIEW] Will reload and retry...')
+                        continue
+                    result['summary'] = 'Write a review button not found'
+                    return result
+
+                await asyncio.sleep(5)
+                _log(worker_id, '[WRITE_REVIEW] Clicked Write a review - waiting for popup...')
 
             # ── 3. Wait for review popup ─────────────────────────────────────
             popup_ready = False

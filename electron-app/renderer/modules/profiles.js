@@ -664,6 +664,7 @@
             _setVal('pmEmail', p.email || '');
             _setVal('pmPassword', p.password || '');
             _setVal('pmTotp', p.totp_secret || '');
+            _startPmTotp();
             _setVal('pmNotes', p.notes || '');
             _setVal('pmAddress', p.address || '');
             const codes = p.backup_codes || [];
@@ -690,6 +691,7 @@
         _setVal('pmProxyPaste', '');
         _toggleProxyFields();
         _setVal('pmEmail', ''); _setVal('pmPassword', ''); _setVal('pmTotp', ''); _setVal('pmNotes', ''); _setVal('pmAddress', '');
+        _stopPmTotp();
         for (let i = 1; i <= 10; i++) _setVal('pmBC' + i, '');
         _switchTab('overview');
     }
@@ -740,6 +742,51 @@
         const type = _val('pmProxyType');
         const fields = _$('pmProxyFields');
         if (fields) fields.style.display = type === 'none' ? 'none' : 'block';
+    }
+
+    // ── Inline TOTP widget (credentials tab) ──────────────────────────────
+    let _pmTotpInterval = null;
+
+    async function _updatePmTotp() {
+        const codeEl = _$('pmTotpCode');
+        const barEl  = _$('pmTotpTimerBar');
+        if (!codeEl) return;
+        const secret = _val('pmTotp').trim();
+        if (!secret || secret.length < 16) {
+            codeEl.innerText = '------';
+            if (barEl) barEl.style.width = '0%';
+            return;
+        }
+        try {
+            const code = await App._generateTOTP(secret);
+            codeEl.innerText = code || 'INVALID';
+        } catch { codeEl.innerText = 'ERROR'; }
+        const remaining = 30 - (Math.floor(Date.now() / 1000) % 30);
+        if (barEl) barEl.style.width = ((remaining / 30) * 100) + '%';
+    }
+
+    function _startPmTotp() {
+        _stopPmTotp();
+        const secret = _val('pmTotp').trim();
+        const widget = _$('pmTotpWidget');
+        if (!widget) return;
+        if (secret && secret.length >= 16) {
+            widget.style.display = 'block';
+            _updatePmTotp();
+            _pmTotpInterval = setInterval(_updatePmTotp, 1000);
+        } else {
+            widget.style.display = 'none';
+        }
+    }
+
+    function _stopPmTotp() {
+        if (_pmTotpInterval) { clearInterval(_pmTotpInterval); _pmTotpInterval = null; }
+        const widget = _$('pmTotpWidget');
+        if (widget) widget.style.display = 'none';
+        const codeEl = _$('pmTotpCode');
+        if (codeEl) codeEl.innerText = '------';
+        const barEl = _$('pmTotpTimerBar');
+        if (barEl) barEl.style.width = '0%';
     }
 
     // ══════════════════════════════════════════════════════════════════════
@@ -823,6 +870,7 @@
     function closeModal() {
         _$('profileModalOverlay').classList.remove('active');
         _editingId = null;
+        _stopPmTotp();
     }
 
     // ══════════════════════════════════════════════════════════════════════
@@ -1280,6 +1328,72 @@
         } catch(e) { App.toast('Write Review error: ' + e.message, 'error'); }
     }
 
+    // ── GMB URL → Review URL Converter ──────────────────────────────────────
+    let _gmbPreviewTimer = null;
+
+    function openGmbToReviewModal() {
+        _$('gmbToReviewModalOverlay').style.display = 'flex';
+        _setGmbPreview(null);
+        _$('gmbToReviewProgress').style.display = 'none';
+        const btn = _$('gmbToReviewStartBtn');
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-play"></i> Generate Review URLs'; }
+    }
+
+    function closeGmbToReviewModal() {
+        _$('gmbToReviewModalOverlay').style.display = 'none';
+    }
+
+    function _setGmbPreview(info) {
+        const el = _$('gmbToReviewPreview');
+        if (!el) return;
+        if (!info) { el.style.display = 'none'; return; }
+        el.style.display = 'flex';
+        if (!info.success) {
+            el.innerHTML = `<span style="color:#f87171;"><i class="fas fa-exclamation-circle"></i> ${_esc(info.message || 'Cannot read file')}</span>`;
+            return;
+        }
+        el.innerHTML = `
+            <span style="color:#4ade80;"><i class="fas fa-file-excel"></i> <strong>${info.total_rows}</strong> total rows</span>
+            <span style="color:#a5b4fc;"><i class="fas fa-link"></i> <strong>${info.gmb_url_count}</strong> GMB URLs found</span>
+            ${info.columns ? `<span style="color:#64748b;font-size:11px;">Columns: ${_esc(info.columns.join(', '))}</span>` : ''}
+        `;
+    }
+
+    async function _previewGmbFile() {
+        const filePath = _val('gmbToReviewFilePath').trim();
+        if (!filePath) { _setGmbPreview(null); return; }
+        if (_gmbPreviewTimer) clearTimeout(_gmbPreviewTimer);
+        _gmbPreviewTimer = setTimeout(async () => {
+            try {
+                const data = await _api('/api/gmb-to-review/preview', {
+                    method: 'POST', body: JSON.stringify({ file_path: filePath })
+                });
+                _setGmbPreview(data);
+            } catch(e) { _setGmbPreview({ success: false, message: e.message }); }
+        }, 400);
+    }
+
+    async function startGmbToReview() {
+        const filePath = _val('gmbToReviewFilePath').trim();
+        if (!filePath) { App.toast('Select an Excel file first', 'error'); return; }
+
+        try {
+            const data = await _api('/api/gmb-to-review/process', {
+                method: 'POST',
+                body: JSON.stringify({ file_path: filePath })
+            });
+            if (data.success) {
+                closeGmbToReviewModal();
+                App.toast('GMB Review URL generation started', 'success');
+                _startOpProgress('gmb-review');
+            } else {
+                App.toast(data.message || 'Failed to start', 'error');
+            }
+        } catch(e) {
+            App.toast('GMB Review URL error: ' + e.message, 'error');
+        }
+    }
+
     // ── Pagination helper ─────────────────────────────────────────────────────
     const _MODAL_PAGE_SIZE = 15;
 
@@ -1321,6 +1435,15 @@
     async function openAppealModal() {
         const modal = document.getElementById('appealModal');
         if (!modal) return;
+
+        // Reset mode to Select
+        _appealMode = 'select';
+        _appealExcelPath = '';
+        _setAppealMode('select');
+        const excelName = document.getElementById('appealExcelFileName');
+        if (excelName) excelName.textContent = 'No file selected';
+        const excelInfo = document.getElementById('appealExcelMatchInfo');
+        if (excelInfo) { excelInfo.style.display = 'none'; excelInfo.innerHTML = ''; }
 
         // Reset search/page/group state
         _appealSearch = '';
@@ -1437,6 +1560,86 @@
     function closeAppealModal() {
         const modal = document.getElementById('appealModal');
         if (modal) modal.style.display = 'none';
+    }
+
+    // ── Appeal Mode Toggle (Select vs Excel) ────────────────────────────────
+    let _appealMode = 'select'; // 'select' | 'excel'
+    let _appealExcelPath = '';
+
+    function _setAppealMode(mode) {
+        _appealMode = mode;
+        const selectBtn = document.getElementById('appealModeSelectBtn');
+        const excelBtn = document.getElementById('appealModeExcelBtn');
+        const selectControls = document.getElementById('appealSelectControls');
+        const excelControls = document.getElementById('appealExcelControls');
+        const hint = document.getElementById('appealModeHint');
+
+        if (mode === 'excel') {
+            selectBtn.classList.remove('active');
+            selectBtn.style.background = 'transparent';
+            selectBtn.style.color = '#94a3b8';
+            excelBtn.classList.add('active');
+            excelBtn.style.background = '';
+            excelBtn.style.color = '';
+            if (selectControls) selectControls.style.display = 'none';
+            if (excelControls) excelControls.style.display = '';
+            if (hint) hint.textContent = 'Upload an Excel file with an Email column.';
+        } else {
+            excelBtn.classList.remove('active');
+            excelBtn.style.background = 'transparent';
+            excelBtn.style.color = '#94a3b8';
+            selectBtn.classList.add('active');
+            selectBtn.style.background = '';
+            selectBtn.style.color = '';
+            if (selectControls) selectControls.style.display = '';
+            if (excelControls) excelControls.style.display = 'none';
+            if (hint) hint.textContent = 'Select profiles to run Appeal on.';
+        }
+    }
+
+    async function _appealBrowseExcel() {
+        const filePath = await window.electronAPI.selectFile();
+        if (!filePath) return;
+        _appealExcelPath = filePath;
+        const nameEl = document.getElementById('appealExcelFileName');
+        if (nameEl) nameEl.textContent = filePath.split(/[\\/]/).pop();
+
+        // Match emails against profiles
+        const infoEl = document.getElementById('appealExcelMatchInfo');
+        if (infoEl) {
+            infoEl.style.display = '';
+            infoEl.innerHTML = '<i class="fas fa-spinner fa-spin" style="color:#f59e0b;"></i> <span style="color:#94a3b8;font-size:12px;">Matching emails...</span>';
+        }
+        try {
+            const data = await _api('/api/profiles/appeal-match-excel', {
+                method: 'POST',
+                body: JSON.stringify({ file_path: filePath })
+            });
+            if (!data.success) {
+                if (infoEl) infoEl.innerHTML = `<span style="color:#f87171;font-size:12px;"><i class="fas fa-exclamation-circle"></i> ${_esc(data.message)}</span>`;
+                return;
+            }
+            // Auto-select matched profiles
+            _appealChecked.clear();
+            (data.matched || []).forEach(m => _appealChecked.add(m.id));
+            _renderAppealList();
+            _updateAppealCount();
+
+            // Show match summary
+            let html = `<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;">
+                <span style="font-size:13px;color:#e2e8f0;font-weight:600;"><i class="fas fa-check-circle" style="color:#22c55e;margin-right:4px;"></i>${data.matched_count} matched</span>
+                <span style="font-size:12px;color:#94a3b8;">out of ${data.total_emails} emails</span>`;
+            if (data.not_found_count > 0) {
+                html += `<span style="font-size:12px;color:#f59e0b;"><i class="fas fa-exclamation-triangle" style="margin-right:3px;"></i>${data.not_found_count} not found</span>`;
+            }
+            html += `</div>`;
+            if (data.not_found_count > 0 && data.not_found.length <= 10) {
+                html += `<div style="margin-top:6px;font-size:11px;color:#64748b;max-height:80px;overflow-y:auto;">Not found: ${data.not_found.map(e => _esc(e)).join(', ')}</div>`;
+            }
+            if (infoEl) infoEl.innerHTML = html;
+        } catch (e) {
+            if (infoEl) infoEl.innerHTML = `<span style="color:#f87171;font-size:12px;"><i class="fas fa-exclamation-circle"></i> Error reading file</span>`;
+        }
     }
 
     async function startDoAllAppeal() {
@@ -1880,6 +2083,7 @@
         'setai':       { icon: 'fa-robot',        label: 'SetAI Hook',     successLbl: 'Hooked',      failLbl: 'Failed',  pendingLbl: 'Remaining' },
         'delete':      { icon: 'fa-trash',        label: 'Delete Profiles', successLbl: 'Deleted',    failLbl: 'Failed',  pendingLbl: 'Remaining' },
         'run-ops':     { icon: 'fa-cogs',         label: 'Run Operations',  successLbl: 'Done',       failLbl: 'Failed',  pendingLbl: 'Remaining' },
+        'gmb-review':  { icon: 'fa-link',         label: 'GMB Review URL',  successLbl: 'Resolved',   failLbl: 'Failed',  pendingLbl: 'Remaining' },
     };
 
     // Auto-detect running operations on page load / refresh
@@ -1892,6 +2096,7 @@
                 { type: 'appeal', url: '/api/profiles/appeal-status' },
                 { type: 'health', url: '/api/profiles/health-status' },
                 { type: 'review', url: '/api/profiles/review-status' },
+                { type: 'gmb-review', url: '/api/gmb-to-review/status' },
             ];
             for (const chk of checks) {
                 try {
@@ -2030,6 +2235,14 @@
                         isRunning = p.status === 'processing';
                         reportPath = p.report_path;
                     }
+                } else if (type === 'gmb-review') {
+                    const st = await _api('/api/gmb-to-review/status');
+                    done = st.done || 0;
+                    total = st.total || 0;
+                    isRunning = !!st.running;
+                    successCount = st.success || 0;
+                    failedCount = st.failed || 0;
+                    reportPath = st.report_path;
                 } else {
                     let endpoint;
                     if (type === 'run-ops') endpoint = '/api/profiles/ops-status';
@@ -2127,6 +2340,27 @@
                     } else if (type === 'relogin') {
                         App.toast(`Re-Login complete: ${successCount} success, ${failedCount} failed`, 'success');
                         if (reportPath) _showReloginReportReady(reportPath, { success: successCount, failed: failedCount });
+                    } else if (type === 'gmb-review') {
+                        App.toast(`GMB Review URLs: ${successCount} resolved, ${failedCount} failed`, 'success');
+                        // Auto-download the generated Excel
+                        if (reportPath) {
+                            try {
+                                const dlResp = await App.apiFetch('/api/gmb-to-review/download');
+                                if (dlResp.ok) {
+                                    const cd = dlResp.headers.get('Content-Disposition') || '';
+                                    const m = cd.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+                                    const fn = m ? m[1].replace(/['"]/g, '') : 'GMB_Review_URLs.xlsx';
+                                    const blob = await dlResp.blob();
+                                    const u = URL.createObjectURL(blob);
+                                    const a = document.createElement('a');
+                                    a.href = u; a.download = fn;
+                                    document.body.appendChild(a); a.click();
+                                    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(u); }, 1000);
+                                }
+                            } catch(e) { /* ignore download error */ }
+                            // Refresh Reports tab so file is always accessible
+                            if (typeof App !== 'undefined' && App.loadReports) setTimeout(() => App.loadReports(), 1000);
+                        }
                     }
                     loadProfiles();
                 }
@@ -2415,6 +2649,11 @@
                 _updateAppealCount();
             });
         }
+        // Appeal mode toggle (Select vs Excel)
+        _btn('appealModeSelectBtn', () => _setAppealMode('select'));
+        _btn('appealModeExcelBtn', () => _setAppealMode('excel'));
+        _btn('appealExcelBrowseBtn', _appealBrowseExcel);
+
         document.getElementById('appealModal')?.addEventListener('click', e => {
             if (e.target === document.getElementById('appealModal')) closeAppealModal();
         });
@@ -2424,6 +2663,15 @@
         _btn('writeReviewCancelBtn', closeWriteReviewModal);
         _btn('writeReviewStartBtn', startWriteReview);
         _btn('writeReviewBrowseBtn', async () => { await browseFile('writeReviewFilePath'); _previewWRFile(); });
+
+        // GMB → Review URL
+        _btn('profileGmbToReviewBtn', openGmbToReviewModal);
+        _btn('gmbToReviewCloseBtn', closeGmbToReviewModal);
+        _btn('gmbToReviewCancelBtn', closeGmbToReviewModal);
+        _btn('gmbToReviewStartBtn', startGmbToReview);
+        _btn('gmbToReviewBrowseBtn', async () => { await browseFile('gmbToReviewFilePath'); _previewGmbFile(); });
+        const gmbFileInp = _$('gmbToReviewFilePath');
+        if (gmbFileInp) gmbFileInp.addEventListener('input', _previewGmbFile);
 
         // Export template
         _btn('writeReviewTemplateBtn', async () => {
@@ -2598,6 +2846,21 @@
 
         _btn('pmCheckProxy', checkProxy);
         _btn('pmParseProxy', parseProxyString);
+
+        // TOTP widget: live update on secret change + copy btn
+        const pmTotpInp = _$('pmTotp');
+        if (pmTotpInp) {
+            pmTotpInp.addEventListener('input', () => _startPmTotp());
+            pmTotpInp.addEventListener('paste', () => setTimeout(_startPmTotp, 50));
+        }
+        _btn('pmTotpCopyBtn', () => {
+            const code = (_$('pmTotpCode') || {}).innerText;
+            if (code && code !== '------') {
+                navigator.clipboard.writeText(code);
+                const btn = _$('pmTotpCopyBtn');
+                if (btn) { btn.innerHTML = '<i class="fas fa-check"></i>'; setTimeout(() => { btn.innerHTML = '<i class="fas fa-copy"></i>'; }, 1500); }
+            }
+        });
 
         // Tab switching
         document.querySelectorAll('.pm-tab').forEach(tab => {

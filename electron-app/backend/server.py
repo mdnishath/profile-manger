@@ -2421,6 +2421,56 @@ def profiles_appeal_status():
     return jsonify(profile_manager.get_appeal_status())
 
 
+@app.route('/api/profiles/appeal-match-excel', methods=['POST'])
+def profiles_appeal_match_excel():
+    """Read an Excel file, extract emails, and return matched profile IDs."""
+    data = request.get_json(force=True, silent=True) or {}
+    file_path = data.get('file_path', '')
+    if not file_path or not os.path.isfile(file_path):
+        return jsonify({'success': False, 'message': 'File not found'})
+    try:
+        df = pd.read_excel(file_path, engine='openpyxl')
+        # Find the email column (case-insensitive)
+        email_col = None
+        for c in df.columns:
+            if str(c).strip().lower() == 'email':
+                email_col = c
+                break
+        if email_col is None:
+            return jsonify({'success': False, 'message': 'No "Email" column found in the Excel file'})
+        # Collect unique emails from Excel
+        emails_in_excel = set()
+        for _, row in df.iterrows():
+            e = str(row.get(email_col, '')).strip().lower()
+            if e and e != 'nan':
+                emails_in_excel.add(e)
+        if not emails_in_excel:
+            return jsonify({'success': False, 'message': 'No emails found in the file'})
+        # Match against existing profiles
+        all_profiles = profile_manager.list_profiles()
+        matched = []
+        not_found = []
+        for email in emails_in_excel:
+            found = False
+            for p in all_profiles:
+                if (p.get('email') or '').strip().lower() == email:
+                    matched.append({'id': p['id'], 'email': p.get('email', '')})
+                    found = True
+                    break
+            if not found:
+                not_found.append(email)
+        return jsonify({
+            'success': True,
+            'total_emails': len(emails_in_excel),
+            'matched': matched,
+            'matched_count': len(matched),
+            'not_found': not_found,
+            'not_found_count': len(not_found),
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+
 @app.route('/api/profiles/<profile_id>/relogin', methods=['POST'])
 def profiles_relogin(profile_id):
     """Re-login a single profile using its saved credentials."""
@@ -2607,6 +2657,7 @@ def profiles_write_review_template():
     # Column definitions: (header, width, note)
     columns = [
         ('Email',        30),
+        ('Review URL',   55),
         ('GMB URL',      45),
         ('Review Text',  55),
         ('Review Stars', 14),
@@ -2620,13 +2671,13 @@ def profiles_write_review_template():
         ws.column_dimensions[get_column_letter(col_idx)].width = w
     ws.row_dimensions[1].height = 24
 
-    # Example rows
+    # Example rows  (Review URL, GMB URL, Review Text, Stars)
     examples = [
-        ('john123@gmail.com',  'https://maps.google.com/maps?cid=123456789012345', 'Amazing place! Highly recommend to everyone. Very professional and friendly staff.', 5),
-        ('mary456@gmail.com',  'https://maps.google.com/maps?cid=987654321098765', 'Great experience overall. Clean, organised and the team is very helpful.', 4),
-        ('alex789@gmail.com',  'https://maps.google.com/maps?cid=111222333444555', 'Excellent service and quality. Will definitely visit again. Truly outstanding!', 5),
-        ('sara001@gmail.com',  'https://maps.google.com/maps?cid=666777888999000', '',                                                                                  5),
-        ('test002@gmail.com',  'https://maps.google.com/maps?cid=222333444555666', 'Very good. Satisfied with the service provided by the team here.',                 4),
+        ('john123@gmail.com',  'https://www.google.com/maps/place//data=!4m3!3m2!1s0x1234:0x5678!12e1', 'https://maps.google.com/maps?cid=123456789012345', 'Amazing place! Highly recommend to everyone. Very professional and friendly staff.', 5),
+        ('mary456@gmail.com',  'https://www.google.com/maps/place//data=!4m3!3m2!1s0xAAAA:0xBBBB!12e1', 'https://maps.google.com/maps?cid=987654321098765', 'Great experience overall. Clean, organised and the team is very helpful.', 4),
+        ('alex789@gmail.com',  'https://www.google.com/maps/place//data=!4m3!3m2!1s0xCCCC:0xDDDD!12e1', 'https://maps.google.com/maps?cid=111222333444555', 'Excellent service and quality. Will definitely visit again. Truly outstanding!', 5),
+        ('sara001@gmail.com',  'https://www.google.com/maps/place//data=!4m3!3m2!1s0xEEEE:0xFFFF!12e1', 'https://maps.google.com/maps?cid=666777888999000', '',                                                                                  5),
+        ('test002@gmail.com',  'https://www.google.com/maps/place//data=!4m3!3m2!1s0x1111:0x2222!12e1', 'https://maps.google.com/maps?cid=222333444555666', 'Very good. Satisfied with the service provided by the team here.',                 4),
     ]
 
     row_fills = ['EFF6FF', 'F0FDF4', 'EFF6FF', 'FEF9C3', 'F0FDF4']
@@ -2685,11 +2736,12 @@ def profiles_write_review_template():
     # Required columns section
     _irow(r, '  REQUIRED COLUMNS', '', bfont=h2_font, bfill=h2_fill, height=24, merge_bc=True); r += 1
     _irow(r, 'Email', 'The Gmail account email address. Must match exactly what is saved in the profile.', bfont=label_font, cfont=body_font, height=28); r += 1
-    _irow(r, 'GMB URL', 'The Google Maps business page URL. Open Google Maps → find the business → copy the full URL from the browser address bar.', bfont=label_font, cfont=body_font, height=40); r += 1
+    _irow(r, 'Review URL', 'Direct review link that opens the review popup instantly. Use "GMB → Review URL" tool to generate these. RECOMMENDED — much faster than GMB URL.', bfont=label_font, cfont=body_font, height=40); r += 1
     _irow(r, height=8); r += 1
 
     # Optional columns section
     _irow(r, '  OPTIONAL COLUMNS', '', bfont=h2_font, bfill=h2_fill, height=24, merge_bc=True); r += 1
+    _irow(r, 'GMB URL', 'Fallback: Google Maps business page URL. Only used if Review URL is empty for that row. Slower — requires clicking "Write a review" button.', bfont=label_font, cfont=body_font, height=40); r += 1
     _irow(r, 'Review Text', 'The review text to post. Leave blank to post stars only (no text review).', bfont=label_font, cfont=body_font, height=28); r += 1
     _irow(r, 'Review Stars', 'Number from 1 to 5. If left blank or missing, defaults to 5 stars.', bfont=label_font, cfont=body_font, height=28); r += 1
     _irow(r, height=8); r += 1
@@ -2697,13 +2749,14 @@ def profiles_write_review_template():
     # Rules section
     _irow(r, '  RULES', '', bfont=h2_font, bfill=h2_fill, height=24, merge_bc=True); r += 1
     rules = [
-        '1.  Column headers must be EXACTLY: Email, GMB URL, Review Text, Review Stars',
-        '2.  Spelling and capitalisation matters — "email" or "gmb url" will NOT work',
+        '1.  Column headers must be EXACTLY: Email, Review URL, GMB URL, Review Text, Review Stars',
+        '2.  Spelling and capitalisation matters — "email" or "review url" will NOT work',
         '3.  One account per row — do not merge or duplicate rows',
-        '4.  Rows with empty Email or empty GMB URL are skipped automatically',
+        '4.  Rows with empty Email or no URL (both Review URL and GMB URL empty) are skipped',
         '5.  Stars must be a plain number: 1, 2, 3, 4 or 5 — not "5 stars" or "five"',
         '6.  The system matches each row to a profile by email — no manual selection needed',
         '7.  If an email is in the sheet but not saved as a profile, that row is skipped',
+        '8.  Review URL is preferred — if both Review URL and GMB URL are filled, Review URL is used',
     ]
     for rule in rules:
         _irow(r, '', rule, cfont=body_font, height=22); r += 1
@@ -2728,8 +2781,8 @@ def profiles_write_review_template():
     # Do / Don't
     _irow(r, '  ✅  CORRECT EXAMPLES', '', bfont=Font(name='Calibri', bold=True, size=12, color='065F46'), bfill=green_fill, height=24, merge_bc=True); r += 1
     goods = [
-        'john123@gmail.com  |  https://maps.google.com/maps?cid=123  |  Great service!  |  5',
-        'mary456@gmail.com  |  https://www.google.com/maps/place/...  |  (blank — stars only)  |  4',
+        'john@gmail.com  |  Review URL: https://google.com/maps/place//data=...  |  Great service!  |  5  (fastest)',
+        'mary@gmail.com  |  Review URL: (blank)  |  GMB URL: https://maps.google.com/maps?cid=123  |  4  (fallback)',
     ]
     for g in goods:
         _irow(r, '', g, cfont=ok_font, height=22); r += 1
@@ -2738,9 +2791,9 @@ def profiles_write_review_template():
     _irow(r, '  ❌  WRONG EXAMPLES (will be skipped or cause errors)', '', bfont=Font(name='Calibri', bold=True, size=12, color='991B1B'), bfill=red_fill, height=24, merge_bc=True); r += 1
     bads = [
         'john123  |  (missing @gmail.com — won\'t match any profile)',
-        '(blank)  |  https://maps.google.com/...  |  Review  |  5  — row skipped: no email',
-        'mary@gmail.com  |  (blank GMB URL)  — row skipped: no URL',
-        'john@gmail.com  |  maps.google.com/...  |  text  |  5 stars  — stars must be a number',
+        '(blank)  |  https://google.com/maps/place/...  |  Review  |  5  — row skipped: no email',
+        'mary@gmail.com  |  (both Review URL and GMB URL blank)  — row skipped: no URL',
+        'john@gmail.com  |  Review URL  |  text  |  5 stars  — stars must be a number',
     ]
     for b in bads:
         _irow(r, '', b, cfont=warn_font, height=22); r += 1
@@ -2769,13 +2822,18 @@ def profiles_write_review_preview():
     try:
         df = pd.read_excel(excel_file)
         cols = list(df.columns)
-        has_required = 'Email' in cols and 'GMB URL' in cols
+        has_review_url = 'Review URL' in cols
+        has_gmb_url = 'GMB URL' in cols
+        has_required = 'Email' in cols and (has_review_url or has_gmb_url)
         valid = 0
         if has_required:
             for _, row in df.iterrows():
                 email = str(row.get('Email', '')).strip()
-                gmb = str(row.get('GMB URL', '')).strip()
-                if email and gmb and email.lower() != 'nan' and gmb.lower() != 'nan':
+                review_url = str(row.get('Review URL', '')).strip() if has_review_url else ''
+                gmb = str(row.get('GMB URL', '')).strip() if has_gmb_url else ''
+                if review_url.lower() == 'nan': review_url = ''
+                if gmb.lower() == 'nan': gmb = ''
+                if email and email.lower() != 'nan' and (review_url or gmb):
                     valid += 1
         # Count how many profiles match the emails
         emails_in_excel = set()
@@ -2793,6 +2851,205 @@ def profiles_write_review_preview():
         })
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)})
+
+
+@app.route('/api/gmb-to-review/preview', methods=['POST'])
+def gmb_to_review_preview():
+    """Preview Excel file for GMB → Review URL — returns row count and GMB URL count."""
+    data = request.get_json(force=True, silent=True) or {}
+    file_path = data.get('file_path', '').strip()
+    if not file_path or not os.path.isfile(file_path):
+        return jsonify({'success': False, 'message': 'File not found'})
+    try:
+        df = pd.read_excel(file_path)
+        cols = list(df.columns)
+        if 'GMB URL' not in cols:
+            return jsonify({'success': False, 'message': 'Missing required column: "GMB URL"'})
+        gmb_count = int(df['GMB URL'].dropna().astype(str).str.strip().loc[lambda s: (s != '') & (s.str.lower() != 'nan')].shape[0])
+        return jsonify({
+            'success': True,
+            'total_rows': len(df),
+            'gmb_url_count': gmb_count,
+            'columns': cols,
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+
+_gmb_review_progress = {
+    'running': False, 'total': 0, 'done': 0, 'success': 0, 'failed': 0,
+    'current_url': '', 'results': [], 'report_path': None,
+}
+
+def _gmb_review_worker(file_path):
+    """Background thread: resolve GMB URLs and build Review URLs."""
+    import re
+    import requests as req_lib
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+
+    global _gmb_review_progress
+    try:
+        df = pd.read_excel(file_path)
+        rows = []
+        for _, row in df.iterrows():
+            gmb_url = str(row.get('GMB URL', '')).strip()
+            if gmb_url and gmb_url.lower() != 'nan':
+                rows.append((row, gmb_url))
+            else:
+                rows.append((row, ''))
+
+        _gmb_review_progress['total'] = len([r for r in rows if r[1]])
+        _gmb_review_progress['done'] = 0
+        _gmb_review_progress['success'] = 0
+        _gmb_review_progress['failed'] = 0
+        _gmb_review_progress['results'] = []
+
+        review_urls = []
+        for row_data, gmb_url in rows:
+            if not gmb_url:
+                review_urls.append('')
+                continue
+            _gmb_review_progress['current_url'] = gmb_url
+            try:
+                r = req_lib.head(gmb_url, allow_redirects=True, timeout=15)
+                match = re.search(r'(?:!1s|ftid=)(0x[0-9a-fA-F]+:0x[0-9a-fA-F]+)', r.url)
+                if match:
+                    hex_cid = match.group(1)
+                    review_url = f"https://www.google.com/maps/place//data=!4m3!3m2!1s{hex_cid}!12e1"
+                    review_urls.append(review_url)
+                    _gmb_review_progress['success'] += 1
+                    _gmb_review_progress['results'].append({'url': gmb_url, 'status': 'success', 'review_url': review_url})
+                else:
+                    review_urls.append('ERROR: CID not found')
+                    _gmb_review_progress['failed'] += 1
+                    _gmb_review_progress['results'].append({'url': gmb_url, 'status': 'failed', 'error': 'CID not found'})
+            except Exception as e:
+                review_urls.append(f'ERROR: {e}')
+                _gmb_review_progress['failed'] += 1
+                _gmb_review_progress['results'].append({'url': gmb_url, 'status': 'failed', 'error': str(e)})
+            _gmb_review_progress['done'] += 1
+
+        df['Review URL'] = review_urls
+
+        # Build styled Excel
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = 'Review URLs'
+
+        thin = Side(style='thin', color='CBD5E1')
+        border = Border(left=thin, right=thin, top=thin, bottom=thin)
+        hdr_font = Font(name='Calibri', bold=True, color='FFFFFF', size=11)
+        hdr_fill = PatternFill('solid', fgColor='1E3A5F')
+        hdr_align = Alignment(horizontal='center', vertical='center', wrap_text=True)
+
+        headers = list(df.columns)
+        for c, h in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=c, value=h)
+            cell.font = hdr_font
+            cell.fill = hdr_fill
+            cell.alignment = hdr_align
+            cell.border = border
+
+        for r_idx, (_, row) in enumerate(df.iterrows(), 2):
+            for c_idx, col in enumerate(headers, 1):
+                val = row[col]
+                if pd.isna(val):
+                    val = ''
+                cell = ws.cell(row=r_idx, column=c_idx, value=val)
+                cell.border = border
+                if col == 'Review URL':
+                    if str(val).startswith('ERROR'):
+                        cell.font = Font(color='DC2626')
+                    elif val:
+                        cell.font = Font(color='059669')
+
+        for c_idx, col in enumerate(headers, 1):
+            max_len = len(str(col))
+            for row in ws.iter_rows(min_row=2, min_col=c_idx, max_col=c_idx):
+                for cell in row:
+                    if cell.value:
+                        max_len = max(max_len, min(len(str(cell.value)), 60))
+            ws.column_dimensions[openpyxl.utils.get_column_letter(c_idx)].width = max_len + 4
+
+        ws.freeze_panes = 'A2'
+
+        # Save to output directory so it appears in Reports tab
+        output_dir = str((Path(__file__).parent.parent / 'output').resolve())
+        os.makedirs(output_dir, exist_ok=True)
+        src_name = os.path.splitext(os.path.basename(file_path))[0]
+        from datetime import datetime
+        ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f'{src_name}_ReviewURLs_{ts}.xlsx'
+        out_path = os.path.join(output_dir, filename)
+        wb.save(out_path)
+        _gmb_review_progress['report_path'] = out_path
+
+    except Exception as e:
+        _gmb_review_progress['results'].append({'url': '', 'status': 'failed', 'error': str(e)})
+    finally:
+        _gmb_review_progress['running'] = False
+        _gmb_review_progress['current_url'] = ''
+
+
+@app.route('/api/gmb-to-review/process', methods=['POST'])
+def gmb_to_review_process():
+    """Start background thread to resolve GMB URLs and build Review URLs."""
+    import threading
+
+    global _gmb_review_progress
+    if _gmb_review_progress.get('running'):
+        return jsonify({'success': False, 'message': 'Already processing'}), 400
+
+    data = request.get_json(force=True, silent=True) or {}
+    file_path = data.get('file_path', '').strip()
+    if not file_path or not os.path.isfile(file_path):
+        return jsonify({'success': False, 'message': 'File not found'}), 400
+
+    try:
+        df = pd.read_excel(file_path)
+        if 'GMB URL' not in df.columns:
+            return jsonify({'success': False, 'message': 'Missing required column: "GMB URL"'}), 400
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+    _gmb_review_progress = {
+        'running': True, 'total': 0, 'done': 0, 'success': 0, 'failed': 0,
+        'current_url': '', 'results': [], 'report_path': None,
+    }
+
+    t = threading.Thread(target=_gmb_review_worker, args=(file_path,), daemon=True)
+    t.start()
+
+    return jsonify({'success': True, 'message': 'Processing started'})
+
+
+@app.route('/api/gmb-to-review/status', methods=['GET'])
+def gmb_to_review_status():
+    """Return current progress of GMB → Review URL processing."""
+    return jsonify({
+        'running': _gmb_review_progress.get('running', False),
+        'total': _gmb_review_progress.get('total', 0),
+        'done': _gmb_review_progress.get('done', 0),
+        'success': _gmb_review_progress.get('success', 0),
+        'failed': _gmb_review_progress.get('failed', 0),
+        'current_url': _gmb_review_progress.get('current_url', ''),
+        'report_path': _gmb_review_progress.get('report_path'),
+    })
+
+
+@app.route('/api/gmb-to-review/download', methods=['GET'])
+def gmb_to_review_download():
+    """Download the generated Review URLs Excel file."""
+    report_path = _gmb_review_progress.get('report_path')
+    if not report_path or not os.path.isfile(report_path):
+        return jsonify({'success': False, 'message': 'No report file available'}), 404
+    return send_file(
+        report_path,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        as_attachment=True,
+        download_name=os.path.basename(report_path)
+    )
 
 
 @app.route('/api/nst/status', methods=['GET'])

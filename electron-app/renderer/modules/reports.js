@@ -17,6 +17,7 @@
         const n = name.toLowerCase();
         if (n.includes('appeal'))  return { label: 'Appeal',  color: '#f59e0b' };
         if (n.includes('health')) return { label: 'Health',  color: '#22c55e' };
+        if (n.includes('reviewurls')) return { label: 'GMB Review', color: '#6366f1' };
         if (n.includes('review') || n.includes('step3')) return { label: 'Review', color: '#f472b6' };
         if (n.includes('step2'))  return { label: 'Step 2',  color: '#a78bfa' };
         if (n.includes('step1'))  return { label: 'Step 1',  color: '#60a5fa' };
